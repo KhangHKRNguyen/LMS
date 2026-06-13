@@ -9,51 +9,56 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Str;
 
 class AssignmentController extends Controller
 {
     public function index()
     {
-        $classes = $this->teacherClasses()
-            ->withCount(['students', 'assignments'])
-            ->with(['assignments' => fn ($query) => $query->latest()->limit(5)])
-            ->orderBy('class_name')
-            ->get();
+        // Lấy danh sách các lớp học thuộc về giáo viên này, nạp kèm các bài tập đã giao trong lớp đó
+        $classes = CourseClass::whereHas('users', function ($query) {
+            $query->where('user_id', Auth::id());
+        })
+        ->with(['assignments' => function($query) {
+            $query->latest(); // Sắp xếp bài tập mới giao lên đầu
+        }])
+        ->withCount('students')
+        ->get();
 
+        // Truyền biến $classes ra đúng như View đang chờ đợi
         return view('teacher.assignments.index', compact('classes'));
     }
 
-    public function create(CourseClass $courseClass)
+    public function create()
     {
-        $this->authorizeClass($courseClass);
-
-        $courseClass->loadCount('students');
-
-        return view('teacher.assignments.create', compact('courseClass'));
+        return view('teacher.assignments.create');
     }
 
     public function store(Request $request, ExcelImportService $excelImportService)
     {
+        // Bỏ các rule liên quan đến course_class_id, open_time, due_time
         $rules = [
-            'course_class_id' => ['required', 'exists:course_classes,id'],
-            'title' => ['required', 'string', 'max:255'],
-            'content' => ['nullable', 'string'],
-            'type' => ['required', Rule::in(['Trắc nghiệm', 'Tự luận'])],
-            'open_time' => ['nullable', 'date', 'before:due_time'],
-            'due_time' => ['required', 'date', 'after:now'],
-            'attachment' => ['nullable', 'file', 'max:10240'],
-            'import_file' => ['nullable', 'file', 'max:5120'],
+            'title'            => ['required', 'string', 'max:255'],
+            'content'          => ['nullable', 'string'],
+            'type'             => ['required', Rule::in(['Trắc nghiệm', 'Tự luận'])],
+            'attachment'       => ['nullable', 'file', 'max:10240'],
+            'import_file'      => ['nullable', 'file', 'max:5120'],
+            'skill'            => ['required', Rule::in(['Nghe', 'Đọc', 'Viết', 'Nói'])],
+            'duration_minutes' => ['required', 'integer', 'min:1', 'max:480'],
+            'passage'          => ['nullable', 'string'],
+            'audio_file'       => ['nullable', 'file', 'mimes:mp3,wav,m4a', 'max:20480'],
         ];
 
         if ($request->input('type') === 'Trắc nghiệm' && ! $request->hasFile('import_file')) {
             $rules = array_merge($rules, [
-                'questions' => ['required', 'array', 'min:1'],
-                'questions.*.question_text' => ['required', 'string'],
-                'questions.*.option_a' => ['required', 'string'],
-                'questions.*.option_b' => ['required', 'string'],
-                'questions.*.option_c' => ['required', 'string'],
-                'questions.*.option_d' => ['required', 'string'],
+                'questions'                  => ['required', 'array', 'min:1'],
+                'questions.*.question_text'  => ['required', 'string'],
+                'questions.*.option_a'       => ['required', 'string'],
+                'questions.*.option_b'       => ['required', 'string'],
+                'questions.*.option_c'       => ['required', 'string'],
+                'questions.*.option_d'       => ['required', 'string'],
                 'questions.*.correct_option' => ['required', Rule::in(['A', 'B', 'C', 'D'])],
             ]);
         }
@@ -63,8 +68,6 @@ class AssignmentController extends Controller
         }
 
         $validated = $request->validate($rules);
-        $courseClass = CourseClass::findOrFail($validated['course_class_id']);
-        $this->authorizeClass($courseClass);
 
         $questions = [];
         if ($validated['type'] === 'Trắc nghiệm') {
@@ -73,47 +76,117 @@ class AssignmentController extends Controller
                 : array_values($validated['questions']);
         }
 
-        $assignment = DB::transaction(function () use ($request, $validated, $courseClass, $questions) {
-            $filePath = $request->file('attachment')?->store('assignments', 'public');
+        $assignment = DB::transaction(function () use ($request, $validated, $questions) {
+            $filePath = $request->file('attachment')?->store('assignments/attachments', 'public');
+            
+            $audioPath = null;
+            if ($validated['skill'] === 'Nghe' && $request->hasFile('audio_file')) {
+                $audioPath = $request->file('audio_file')->store('assignments/audio', 'public');
+            }
 
+            // Lưu trực tiếp vào Database, KHÔNG CÓ course_class_id và do_time/open_time
             $assignment = Assignment::create([
-                'title' => $validated['title'],
-                'content' => $validated['content'] ?? null,
-                'type' => $validated['type'],
-                'open_time' => $validated['open_time'] ?? now(),
-                'due_time' => $validated['due_time'],
-                'file_path' => $filePath,
-                'course_class_id' => $courseClass->id,
+                'title'            => $validated['title'],
+                'content'          => $validated['content'] ?? null,
+                'type'             => $validated['type'],
+                'file_path'        => $filePath,
+                'course_class_id'  => null, // Xác định đây là Đề thi gốc
+                'is_visible'       => false, // Không dùng cho Đề thi gốc
+                'skill'            => $validated['skill'],
+                'duration_minutes' => $validated['duration_minutes'],
+                'passage'          => $validated['skill'] === 'Đọc' ? ($validated['passage'] ?? null) : null,
+                'audio_path'       => $audioPath,
             ]);
 
             foreach ($questions as $question) {
                 $assignment->questions()->create([
-                    'question_text' => $question['question_text'],
-                    'option_a' => $question['option_a'],
-                    'option_b' => $question['option_b'],
-                    'option_c' => $question['option_c'],
-                    'option_d' => $question['option_d'],
+                    'question_text'  => $question['question_text'],
+                    'option_a'       => $question['option_a'],
+                    'option_b'       => $question['option_b'],
+                    'option_c'       => $question['option_c'],
+                    'option_d'       => $question['option_d'],
                     'correct_option' => mb_strtoupper($question['correct_option']),
-                    'type' => 'single_choice',
+                    'type'           => 'single_choice',
                 ]);
             }
 
             return $assignment;
         });
 
+        // Điều hướng thẳng về danh sách Ngân hàng đề
         return redirect()
-            ->route('teacher.assignments.show', $assignment)
-            ->with('success', 'Giao bài tập thành công.');
+            ->route('teacher.assignments.index')
+            ->with('success', 'Đã lưu đề thi mới vào Ngân hàng đề thành công.');
     }
 
     public function show(Assignment $assignment)
     {
-        $this->authorizeAssignment($assignment);
-
-        $assignment->load(['courseClass', 'questions'])
-            ->loadCount('submissions');
-
+        $assignment->load('questions');
         return view('teacher.assignments.show', compact('assignment'));
+    }
+
+    public function edit(Assignment $assignment)
+    {
+        return view('teacher.assignments.edit', compact('assignment'));
+    }
+
+    public function update(Request $request, Assignment $assignment)
+    {
+        $rules = [
+            'title'            => ['required', 'string', 'max:255'],
+            'content'          => ['nullable', 'string'],
+            'type'             => ['required', Rule::in(['Trắc nghiệm', 'Tự luận'])],
+            'attachment'       => ['nullable', 'file', 'max:10240'],
+            'skill'            => ['required', Rule::in(['Nghe', 'Đọc', 'Viết', 'Nói'])],
+            'duration_minutes' => ['required', 'integer', 'min:1', 'max:480'],
+            'passage'          => ['nullable', 'string'],
+            'audio_file'       => ['nullable', 'file', 'mimes:mp3,wav,m4a', 'max:20480'],
+        ];
+
+        if ($request->input('type') === 'Tự luận') {
+            $rules['content'] = ['required', 'string'];
+        }
+
+        $validated = $request->validate($rules);
+
+        DB::transaction(function () use ($request, $validated, $assignment) {
+            if ($request->hasFile('attachment')) {
+                if ($assignment->file_path) {
+                    Storage::disk('public')->delete($assignment->file_path);
+                }
+                $assignment->file_path = $request->file('attachment')->store('assignments/attachments', 'public');
+            }
+
+            if ($validated['skill'] === 'Nghe') {
+                if ($request->hasFile('audio_file')) {
+                    if ($assignment->audio_path) {
+                        Storage::disk('public')->delete($assignment->audio_path);
+                    }
+                    $assignment->audio_path = $request->file('audio_file')->store('assignments/audio', 'public');
+                }
+            } else {
+                if ($assignment->audio_path) {
+                    Storage::disk('public')->delete($assignment->audio_path);
+                    $assignment->audio_path = null;
+                }
+            }
+
+            // Update cấu hình Đề thi gốc
+            $assignment->update([
+                'title'            => $validated['title'],
+                'content'          => $validated['content'] ?? null,
+                'type'             => $validated['type'],
+                'file_path'        => $assignment->file_path,
+                'skill'            => $validated['skill'],
+                'duration_minutes' => $validated['duration_minutes'],
+                'passage'          => $validated['skill'] === 'Đọc' ? ($validated['passage'] ?? null) : null,
+                'audio_path'       => $assignment->audio_path,
+            ]);
+        });
+
+        return redirect()
+            ->route('teacher.assignments.index')
+            ->with('success', 'Đã cập nhật cấu hình đề thi trong Ngân hàng đề.');
     }
 
     public function parseImport(Request $request, ExcelImportService $excelImportService)
@@ -145,10 +218,9 @@ class AssignmentController extends Controller
     public function export(Assignment $assignment)
     {
         $this->authorizeAssignment($assignment);
-        
         $questions = $assignment->questions()->get();
         
-        $csvContent = "\xEF\xBB\xBF"; // UTF-8 BOM for Excel compatibility
+        $csvContent = "\xEF\xBB\xBF"; 
         $csvContent .= "question_text,option_a,option_b,option_c,option_d,correct_option\n";
         
         foreach ($questions as $question) {
@@ -162,7 +234,7 @@ class AssignmentController extends Controller
             $csvContent .= "\"{$text}\",\"{$a}\",\"{$b}\",\"{$c}\",\"{$d}\",\"{$correct}\"\n";
         }
         
-        $filename = "danh_sach_cau_hoi_" . \Illuminate\Support\Str::slug($assignment->title) . ".csv";
+        $filename = "danh_sach_cau_hoi_" . Str::slug($assignment->title) . ".csv";
         
         return response($csvContent, 200, [
             'Content-Type' => 'text/csv; charset=UTF-8',
@@ -174,16 +246,15 @@ class AssignmentController extends Controller
     {
         $this->authorizeAssignment($assignment);
         
-        if (!$assignment->file_path || !\Illuminate\Support\Facades\Storage::disk('public')->exists($assignment->file_path)) {
+        if (!$assignment->file_path || !Storage::disk('public')->exists($assignment->file_path)) {
             return redirect()->back()->with('error', 'Không tìm thấy file đề bài đính kèm.');
         }
         
         $pathInfo = pathinfo($assignment->file_path);
         $extension = $pathInfo['extension'] ?? 'bin';
+        $filename = "de_bai_" . Str::slug($assignment->title) . "." . $extension;
         
-        $filename = "de_bai_" . \Illuminate\Support\Str::slug($assignment->title) . "." . $extension;
-        
-        return \Illuminate\Support\Facades\Storage::disk('public')->download($assignment->file_path, $filename);
+        return Storage::disk('public')->download($assignment->file_path, $filename);
     }
 
     public function template(ExcelImportService $excelImportService)
@@ -218,17 +289,13 @@ class AssignmentController extends Controller
             403
         );
     }
+
     public function toggleVisibility(Assignment $assignment)
     {
         $this->authorizeAssignment($assignment);
-
-        // Đảo ngược trạng thái hiện tại
-        $assignment->update([
-            'is_visible' => !$assignment->is_visible
-        ]);
-
+        $assignment->update(['is_visible' => !$assignment->is_visible]);
         $statusLabel = $assignment->is_visible ? 'hiển thị' : 'ẩn';
 
-        return redirect()->back()->with('success', "Đã chuyển bài tập sang trạng thái: " . mb_ucfirst($statusLabel));
+        return redirect()->back()->with('success', "Đã chuyển bài tập sang trạng thái: " . Str::ucfirst($statusLabel));
     }
 }

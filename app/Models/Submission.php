@@ -9,8 +9,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Submission extends Model
 {
-    protected $table = 'submissions';
     use HasFactory;
+
+    protected $table = 'submissions';
 
     protected $fillable = [
         'submission_content',
@@ -19,19 +20,33 @@ class Submission extends Model
         'teacher_comment',
         'status',
         'assignment_id',
-        'user_id'
+        'user_id',
+        'listening_score',
+        'reading_score',
+        'writing_score',
+        'speaking_score',
     ];
 
-    protected $casts = [
-        'grade' => 'decimal:2',
-    ];
+    /**
+     * Cấu hình casts theo format mới của Laravel 11
+     */
+    protected function casts(): array
+    {
+        return [
+            'grade' => 'float',
+            'listening_score' => 'float',
+            'reading_score' => 'float',
+            'writing_score' => 'float',
+            'speaking_score' => 'float',
+        ];
+    }
 
     /**
      * Quan hệ N-1: Submission thuộc 1 Assignment
      */
     public function assignment(): BelongsTo
     {
-        return $this->belongsTo(Assignment::class);
+        return $this->belongsTo(Assignment::class, 'assignment_id');
     }
 
     /**
@@ -43,7 +58,7 @@ class Submission extends Model
     }
 
     /**
-     * Quan hệ N-1: Submission thuộc 1 User
+     * Quan hệ N-1: Submission thuộc 1 User (Alias tương thích ngược)
      */
     public function student(): BelongsTo
     {
@@ -55,15 +70,15 @@ class Submission extends Model
      */
     public function studentAnswers(): HasMany
     {
-        return $this->hasMany(StudentAnswer::class);
+        return $this->hasMany(StudentAnswer::class, 'submission_id');
     }
 
     /**
-     * Quan hệ 1-N: Submission có nhiều StudentAnswers
+     * Quan hệ 1-N: Submission có nhiều StudentAnswers (Alias tương thích ngược)
      */
     public function answers(): HasMany
     {
-        return $this->hasMany(StudentAnswer::class);
+        return $this->hasMany(StudentAnswer::class, 'submission_id');
     }
 
     /**

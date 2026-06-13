@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class CourseClass extends Model
 {
@@ -18,6 +20,8 @@ class CourseClass extends Model
         'start_time',
         'end_time',
         'room',
+        'course_id',
+        'status',
     ];
 
     protected function casts(): array
@@ -46,20 +50,26 @@ class CourseClass extends Model
         return $this->hasMany(Assignment::class);
     }
 
-    /**
-     * Quan hệ 1-N: CourseClass có nhiều LeaveRequests (Đơn xin nghỉ)
-     */
-    public function leaveRequests(): HasMany
+    // Lấy tất cả đơn xin nghỉ của lớp này thông qua các Buổi học
+    public function leaveRequests(): HasManyThrough
     {
-        return $this->hasMany(LeaveRequest::class);
+        return $this->hasManyThrough(
+            LeaveRequest::class, 
+            LessonSession::class, 
+            'course_class_id', // Khóa ngoại của CourseClass nằm trên bảng LessonSession
+            'lesson_session_id' // Khóa ngoại của LessonSession nằm trên bảng LeaveRequest
+        );
     }
 
-    /**
-     * Quan hệ 1-N: CourseClass có nhiều Attendances (Điểm danh)
-     */
-    public function attendances(): HasMany
+    // Lấy tất cả lịch sử điểm danh của lớp này thông qua các Buổi học
+    public function attendances(): HasManyThrough
     {
-        return $this->hasMany(Attendance::class);
+        return $this->hasManyThrough(
+            Attendance::class, 
+            LessonSession::class, 
+            'course_class_id', 
+            'lesson_session_id'
+        );
     }
 
     /**
@@ -94,6 +104,17 @@ class CourseClass extends Model
     public function students(): BelongsToMany
     {
         return $this->users()->where('role', 'student');
+    }
+
+    // Một lớp học thì thuộc về một Khóa học
+    public function course(): BelongsTo {
+        return $this->belongsTo(Course::class, 'course_id');
+    }
+
+    // Một lớp học thì có nhiều Buổi học
+    public function lessonSessions()
+    {
+        return $this->hasMany(LessonSession::class, 'course_class_id');
     }
 
     // ===================== HELPER METHODS =====================

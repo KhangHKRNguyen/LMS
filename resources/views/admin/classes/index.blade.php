@@ -1,69 +1,107 @@
-<x-app-layout>
-    <div class="space-y-5">
-        <div class="flex items-center justify-between">
-            <h1 class="text-2xl font-bold text-slate-800">Quản lý lớp học</h1>
-            <a href="{{ route('admin.classes.create') }}"
-               class="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium hover:bg-emerald-700 transition text-sm">
-                + Tạo lớp học
-            </a>
+@extends('layouts.admin')
+
+@section('title', 'Quản lý lớp học')
+
+@section('admin_content')
+<div class="container-fluid py-4">
+    
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
+            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
+    @endif
 
-        <form method="GET" class="flex gap-3">
-            <input type="text" name="search" value="{{ request('search') }}"
-                   placeholder="Tìm theo tên lớp..."
-                   class="border border-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 w-64">
-            <button type="submit" class="bg-slate-700 text-white px-4 py-2 rounded-lg text-sm hover:bg-slate-800 transition">Lọc</button>
-            <a href="{{ route('admin.classes.index') }}" class="bg-slate-200 text-slate-700 px-4 py-2 rounded-lg text-sm hover:bg-slate-300 transition">Xóa lọc</a>
-        </form>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4 class="fw-bold m-0" style="color: #990000; letter-spacing: 0.5px;">QUẢN LÝ DANH SÁCH LỚP HỌC</h4>
+        <a href="{{ route('admin.classes.create') }}" class="btn text-white fw-semibold shadow-sm" style="background-color: #990000; padding: 10px 24px; border-radius: 4px;">
+            + TẠO LỚP HỌC MỚI
+        </a>
+    </div>
 
-        <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-            <table class="w-full text-sm">
-                <thead class="bg-slate-50 border-b border-slate-200">
+    {{-- Tìm kiếm --}}
+    <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px;">
+        <div class="card-body p-3">
+            <form method="GET" action="{{ route('admin.classes.index') }}" class="row g-2 align-items-center">
+                <div class="col-md-4 position-relative">
+                    <span class="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" name="search" value="{{ request('search') }}" placeholder="Tìm theo tên lớp học..." class="form-control ps-5 border-secondary-subtle" style="height: 42px; border-radius: 6px;">
+                </div>
+                <div class="col-md-auto">
+                    <button type="submit" class="btn btn-dark fw-semibold px-4" style="height: 42px; border-radius: 6px;">Lọc</button>
+                    @if(request('search'))
+                        <a href="{{ route('admin.classes.index') }}" class="btn btn-light border ms-1 fw-semibold text-secondary" style="height: 42px; border-radius: 6px;">Xóa bộ lọc</a>
+                    @endif
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {{-- Bảng hiển thị --}}
+    <div class="card border-0 shadow-sm" style="border-radius: 8px; overflow: hidden;">
+        <div class="table-responsive">
+            <table class="table m-0 text-center align-middle table-hover bg-white">
+                <thead style="background-color: #990000; color: white;">
                     <tr>
-                        <th class="text-left px-5 py-3 text-slate-600 font-semibold">#</th>
-                        <th class="text-left px-5 py-3 text-slate-600 font-semibold">Tên lớp</th>
-                        <th class="text-left px-5 py-3 text-slate-600 font-semibold">Phòng</th>
-                        <th class="text-left px-5 py-3 text-slate-600 font-semibold">Thời gian</th>
-                        <th class="text-left px-5 py-3 text-slate-600 font-semibold">HV / BT</th>
-                        <th class="text-right px-5 py-3 text-slate-600 font-semibold">Thao tác</th>
+                        <th style="padding: 14px; width: 80px;">STT</th>
+                        <th class="text-start">Tên lớp học</th>
+                        <th>Khóa học tổng thể</th>
+                        <th>Phòng học</th>
+                        <th>Thời gian lớp học</th>
+                        <th>Trạng thái</th>
+                        <th>Sĩ số</th>
+                        <th style="width: 260px;">Hành động</th>
                     </tr>
                 </thead>
-                <tbody class="divide-y divide-slate-100">
-                    @forelse($classes as $class)
-                    <tr class="hover:bg-slate-50 transition">
-                        <td class="px-5 py-3 text-slate-500">{{ $class->id }}</td>
-                        <td class="px-5 py-3 font-medium text-slate-800">{{ $class->class_name }}</td>
-                        <td class="px-5 py-3 text-slate-600">{{ $class->room ?? '—' }}</td>
-                        <td class="px-5 py-3 text-slate-600 text-xs">
-                            {{ $class->start_time?->format('d/m/Y') }} — {{ $class->end_time?->format('d/m/Y') }}
+                <tbody>
+                    @forelse($classes as $index => $class)
+                    <tr>
+                        <td>{{ $classes->firstItem() + $index }}</td>
+                        <td class="text-start fw-semibold text-secondary ps-3">{{ $class->class_name }}</td>
+                        <td>
+                            <span class="badge bg-light text-dark border px-3 py-2" style="font-size: 12px;">
+                                {{ $class->course?->name ?? 'Không rõ khóa học' }}
+                            </span>
                         </td>
-                        <td class="px-5 py-3 text-slate-600">
-                            <span class="text-emerald-600 font-medium">{{ $class->students_count }}</span> HV /
-                            <span class="text-blue-600 font-medium">{{ $class->assignments_count }}</span> BT
+                        <td><span class="text-muted">{{ $class->room ?? 'Chưa xếp phòng' }}</span></td>
+                        <td style="font-size: 13px;" class="text-secondary fw-medium">
+                            {{ $class->start_time?->format('d/m/Y') }} <i class="bi bi-arrow-right text-danger mx-1"></i> {{ $class->end_time?->format('d/m/Y') }}
                         </td>
-                        <td class="px-5 py-3">
-                            <div class="flex items-center justify-end space-x-2">
-                                <a href="{{ route('admin.classes.members', $class) }}"
-                                   class="text-emerald-600 hover:underline text-xs font-medium">Thành viên</a>
-                                <a href="{{ route('admin.classes.edit', $class) }}"
-                                   class="text-blue-600 hover:underline text-xs font-medium">Sửa</a>
-                                <form method="POST" action="{{ route('admin.classes.destroy', $class) }}"
-                                      onsubmit="return confirm('Xóa lớp {{ $class->class_name }}?')">
+                        <td>
+                            <span class="badge {{ $class->status == 'Đang mở' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }} px-3 py-2">
+                                {{ $class->status }}
+                            </span>
+                        </td>
+                        <td class="fw-bold">
+                            <span class="text-primary">{{ $class->students_count }} Học viên</span> 
+                            <br>
+                            <small class="text-muted">({{ $class->assignments_count }} Bài tập)</small>
+                        </td>
+                        <td>
+                            <div class="d-flex justify-content-center gap-2">
+                                <a href="{{ route('admin.classes.members', $class->id) }}" class="btn btn-sm fw-bold px-3 btn-outline-danger" style="border-radius: 4px;">Thành viên</a>
+                                <a href="{{ route('admin.classes.edit', $class->id) }}" class="btn btn-sm fw-bold px-3 btn-outline-primary" style="border-radius: 4px;">Sửa</a>
+                                <form method="POST" action="{{ route('admin.classes.destroy', $class->id) }}" onsubmit="return confirm('Bạn có chắc chắn muốn xóa lớp học này không?')">
                                     @csrf @method('DELETE')
-                                    <button type="submit" class="text-red-600 hover:underline text-xs font-medium">Xóa</button>
+                                    <button type="submit" class="btn btn-sm text-white fw-bold px-3 btn-danger" style="border-radius: 4px;">Xóa</button>
                                 </form>
                             </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="6" class="text-center py-10 text-slate-400">Không có lớp học nào.</td>
+                        <td colspan="8" class="py-5 text-muted fw-medium">Hệ thống chưa có dữ liệu lớp học nào.</td>
                     </tr>
                     @endforelse
                 </tbody>
             </table>
         </div>
-
-        <div>{{ $classes->links() }}</div>
     </div>
-</x-app-layout>
+
+    <div class="d-flex justify-content-center mt-4">
+        {{ $classes->links('pagination::bootstrap-5') }}
+    </div>
+</div>
+@endsection

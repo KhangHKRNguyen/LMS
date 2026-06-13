@@ -3,155 +3,224 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Course;
 use App\Models\CourseClass;
 use App\Models\User;
+use App\Services\ClassMemberImportService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ClassController extends Controller
 {
+    protected $importService;
+
+    // Inject Service xử lý file thành viên lớp học vào Controller
+    public function __construct(ClassMemberImportService $importService)
+    {
+        $this->importService = $importService;
+    }
+
+    /**
+     * TÍNH NĂNG 1: QUẢN LÝ THÔNG TIN LỚP HỌC (CRUD)
+     */
+
+    // GET /admin/classes - Danh sách lớp học (Có tìm kiếm & phân trang)
     public function index(Request $request)
     {
-        $query = CourseClass::withCount(['students', 'assignments']);
+        // Loại bỏ hoàn toàn khoảng trắng thừa ở hai đầu đầu chuỗi tìm kiếm
+        $search = trim($request->input('search', ''));
 
-        if ($request->filled('search')) {
-            $query->where('class_name', 'like', '%' . $request->search . '%');
-        }
-
-        $classes = $query->orderBy('created_at', 'desc')->paginate(10)->withQueryString();
-
+        $classes = CourseClass::with('course')
+            ->withCount(['users', 'assignments']) 
+            ->when($search, function ($query) use ($search) {
+                // Gom tất cả điều kiện OR vào trong một nhóm WHERE duy nhất bằng Closure
+                return $query->where(function ($subQuery) use ($search) {
+                    $subQuery->where('class_name', 'like', "%{$search}%")
+                            ->orWhere('room', 'like', "%{$search}%")
+                            ->orWhereHas('course', function ($q) use ($search) {
+                                $q->where('name', 'like', "%{$search}%");
+                            });
+                });
+            })
+            ->latest()
+            ->paginate(10);
         return view('admin.classes.index', compact('classes'));
     }
 
+    // GET /admin/classes/create - Giao diện tạo lớp học mới
     public function create()
     {
-        return view('admin.classes.create');
+        $courses = Course::all(); // Lấy danh sách khóa học để admin chọn lựa dropdown
+        return view('admin.classes.create', compact('courses'));
     }
 
+    // POST /admin/classes - Lưu thông tin lớp học mới
     public function store(Request $request)
     {
-        $request->validate([
+        $validated = $request->validate([
             'class_name' => 'required|string|max:255',
+            'course_id'  => 'required|exists:courses,id',
+            'room'       => 'nullable|string|max:255',
             'start_time' => 'required|date',
-            'end_time'   => 'required|date|after:start_time',
-            'room'       => 'nullable|string|max:100',
-        ], [
-            'class_name.required' => 'Tên lớp không được để trống.',
-            'start_time.required' => 'Vui lòng chọn ngày bắt đầu.',
-            'end_time.required'   => 'Vui lòng chọn ngày kết thúc.',
-            'end_time.after'      => 'Ngày kết thúc phải sau ngày bắt đầu.',
+            'end_time'   => 'required|date|after_or_equal:start_time',
+            'status'     => 'required|string|in:Đang mở,Đã đóng',
         ]);
 
-        CourseClass::create($request->only('class_name', 'start_time', 'end_time', 'room'));
+        CourseClass::create($validated);
 
-        return redirect()->route('admin.classes.index')
-                         ->with('success', 'Tạo lớp học thành công!');
+        return redirect()->route('admin.classes.index')->with('success', 'Tạo lớp học mới thành công!');
     }
 
-    public function edit(CourseClass $class)
+    // GET /admin/classes/{id}/edit - Giao diện chỉnh sửa lớp học
+    public function edit($id)
     {
-        return view('admin.classes.edit', compact('class'));
+        $class = CourseClass::findOrFail($id);
+        $courses = Course::all();
+        
+        return view('admin.classes.edit', compact('class', 'courses'));
     }
 
-    public function update(Request $request, CourseClass $class)
+    // PUT /admin/classes/{id} - Cập nhật thông tin lớp học
+    public function update(Request $request, $id)
     {
-        $request->validate([
+        $class = CourseClass::findOrFail($id);
+
+        $validated = $request->validate([
             'class_name' => 'required|string|max:255',
+            'course_id'  => 'required|exists:courses,id',
+            'room'       => 'nullable|string|max:255',
             'start_time' => 'required|date',
-            'end_time'   => 'required|date|after:start_time',
-            'room'       => 'nullable|string|max:100',
-        ], [
-            'class_name.required' => 'Tên lớp không được để trống.',
-            'start_time.required' => 'Vui lòng chọn ngày bắt đầu.',
-            'end_time.required'   => 'Vui lòng chọn ngày kết thúc.',
-            'end_time.after'      => 'Ngày kết thúc phải sau ngày bắt đầu.',
+            'end_time'   => 'required|date|after_or_equal:start_time',
+            'status'     => 'required|string|in:Đang mở,Đã đóng',
         ]);
 
-        $class->update($request->only('class_name', 'start_time', 'end_time', 'room'));
+        $class->update($validated);
 
-        return redirect()->route('admin.classes.index')
-                         ->with('success', 'Cập nhật lớp học thành công!');
+        return redirect()->route('admin.classes.index')->with('success', 'Cập nhật thông tin lớp học thành công!');
     }
 
-    public function destroy(CourseClass $class)
+    // DELETE /admin/classes/{id} - Xóa lớp học
+    public function destroy($id)
     {
-        if (!$class->isDeletable()) {
-            return redirect()->route('admin.classes.index')
-                             ->with('error', 'Không thể xóa lớp đã có học viên hoặc bài tập!');
+        $class = CourseClass::findOrFail($id);
+
+        // Kiểm tra điều kiện có cho phép xóa hay không dựa trên hàm Helper trong model CourseClass của bạn
+        if (method_exists($class, 'isDeletable') && !$class->isDeletable()) {
+            return redirect()->route('admin.classes.index')->with('error', 'Không thể xóa lớp học do đã phát sinh học viên hoặc bài tập!');
         }
 
         $class->delete();
-
-        return redirect()->route('admin.classes.index')
-                         ->with('success', 'Đã xóa lớp học thành công!');
+        return redirect()->route('admin.classes.index')->with('success', 'Xóa lớp học thành công!');
     }
 
-    public function members(CourseClass $class)
+
+    /**
+     * TÍNH NĂNG 2: QUẢN LÝ THÀNH VIÊN TRONG LỚP (LẺ & FILE HÀNG LOẠT)
+     */
+
+    // GET & POST /admin/classes/{id}/members - Giao diện quản lý thành viên chung (Xem list + Đọc file Preview)
+    public function members(Request $request, $id)
     {
-        $teacher  = $class->users()->where('users.role', 'teacher')->first();
-        $students = $class->students()->orderBy('name')->get();
+        $class = CourseClass::findOrFail($id);
+        
+        // Lấy danh sách thành viên hiện tại của lớp học
+        $currentMembers = $class->users()->get(); 
+        $previewMembers = null;
 
-        $allTeachers = User::where('role', 'teacher')->where('status', 'active')->orderBy('name')->get();
+        // Nếu admin thực hiện upload file để xem trước (Preview)
+        if ($request->hasFile('import_file')) {
+            $request->validate([
+                'import_file' => 'required|file|mimes:csv,txt,xlsx|max:5120',
+            ]);
 
-        $availableStudents = User::where('role', 'student')
-                                 ->where('status', 'active')
-                                 ->whereNotIn('id', $students->pluck('id'))
-                                 ->orderBy('name')
-                                 ->get();
-
-        return view('admin.classes.members', compact('class', 'teacher', 'students', 'allTeachers', 'availableStudents'));
-    }
-
-    // FIX 1: Gán giáo viên — xóa đoạn wherePivot lỗi, chỉ giữ logic đúng
-    public function assignTeacher(Request $request, CourseClass $class)
-    {
-        $request->validate([
-            'teacher_id' => 'required|exists:users,id',
-        ]);
-
-        $teacher = User::findOrFail($request->teacher_id);
-
-        if ($teacher->role !== 'teacher') {
-            return back()->with('error', 'Người dùng này không phải giáo viên!');
+            try {
+                // Gọi service xử lý phân tích dữ liệu file import
+                $previewMembers = $this->importService->importMembers($request->file('import_file'));
+            } catch (\Exception $e) {
+                return back()->with('error', 'Lỗi phân tích file: ' . $e->getMessage());
+            }
         }
 
-        // Lấy ID tất cả giáo viên đang có trong lớp
-        $currentTeacherIds = $class->users()
-                                   ->where('users.role', 'teacher')
-                                   ->pluck('users.id');
-
-        // Xóa giáo viên cũ khỏi lớp
-        if ($currentTeacherIds->isNotEmpty()) {
-            $class->users()->detach($currentTeacherIds->toArray());
-        }
-
-        // Gán giáo viên mới
-        $class->users()->attach($teacher->id);
-
-        return back()->with('success', 'Đã gán giáo viên thành công!');
+        return view('admin.classes.members', compact('class', 'currentMembers', 'previewMembers'));
     }
 
-    public function addStudents(Request $request, CourseClass $class)
+    // POST /admin/classes/{id}/members/add-single - Thêm thủ công lẻ 1 thành viên theo Mã số (id)
+    public function addMember(Request $request, $id)
     {
+        $class = CourseClass::findOrFail($id);
+
         $request->validate([
-            'student_ids'   => 'required|array|min:1',
-            'student_ids.*' => 'exists:users,id',
-        ], [
-            'student_ids.required' => 'Vui lòng chọn ít nhất 1 học viên.',
+            'user_code' => 'required|string', // Mã sinh viên/giảng viên nhập từ form lẻ
         ]);
 
-        $studentIds = collect($request->student_ids)->filter(function ($id) {
-            return User::where('id', $id)->where('role', 'student')->exists();
-        });
+        $userCode = $request->input('user_code');
+        $user = User::find($userCode);
 
-        $class->users()->syncWithoutDetaching($studentIds->toArray());
+        if (!$user) {
+            return back()->with('error', "Không tìm thấy tài khoản nào có mã định danh: {$userCode}");
+        }
 
-        return back()->with('success', 'Đã thêm ' . $studentIds->count() . ' học viên vào lớp!');
+        // Kiểm tra xem tài khoản này đã được gán vào lớp này từ trước chưa
+        if ($class->users()->where('user_id', $user->id)->exists()) {
+            return back()->with('error', 'Thành viên này hiện đã có mặt trong lớp học!');
+        }
+
+        // Đính kèm user vào bảng trung gian (class_user)
+        $class->users()->attach($user->id);
+
+        return back()->with('success', "Đã thêm thành công thành viên: {$user->name} vào lớp.");
     }
 
-    public function removeStudent(CourseClass $class, User $user)
+    // DELETE /admin/classes/{class_id}/members/{user_id} - Xóa thành viên khỏi lớp
+    public function removeMember($classId, $userId)
     {
-        $class->users()->detach($user->id);
+        $class = CourseClass::findOrFail($classId);
+        
+        // Gỡ bỏ liên kết trong bảng trung gian
+        $class->users()->detach($userId);
 
-        return back()->with('success', 'Đã xóa học viên khỏi lớp!');
+        return back()->with('success', 'Đã xóa thành viên khỏi lớp học thành open.');
+    }
+
+    // POST /admin/classes/{id}/members/store-bulk - Lưu hàng loạt thành viên từ dữ liệu file preview vào DB
+    public function storeBulkMembers(Request $request, $id)
+    {
+        $class = CourseClass::findOrFail($id);
+        
+        // Phục hồi lại chuỗi JSON được đẩy lên từ input hidden của form xác nhận
+        $verifiedData = $request->input('verified_data');
+        
+        if (!$verifiedData) {
+            return back()->with('error', 'Không tìm thấy dữ liệu xem trước hợp lệ để lưu!');
+        }
+
+        $membersArray = json_decode($verifiedData, true);
+
+        if (!is_array($membersArray)) {
+            return back()->with('error', 'Định dạng dữ liệu xác nhận không chính xác!');
+        }
+
+        DB::beginTransaction();
+        try {
+            $successCount = 0;
+            foreach ($membersArray as $memberData) {
+                // Chỉ xử lý các bản ghi được Service đánh dấu hợp lệ (có id tài khoản thực tế sống trong hệ thống)
+                if (isset($memberData['id'])) {
+                    $user = User::find($memberData['id']);
+                    
+                    if ($user && !$class->users()->where('user_id', $user->id)->exists()) {
+                        $class->users()->attach($user->id);
+                        $successCount++;
+                    }
+                }
+            }
+            DB::commit();
+
+            return redirect()->route('admin.classes.members', $class->id)
+                ->with('success', "Đã nạp thành công hàng loạt {$successCount} thành viên vào lớp học!");
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Hệ thống gặp lỗi khi lưu dữ liệu hàng loạt: ' . $e->getMessage());
+        }
     }
 }

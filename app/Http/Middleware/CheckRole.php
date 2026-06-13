@@ -8,21 +8,15 @@ use Symfony\Component\HttpFoundation\Response;
 
 class CheckRole
 {
-    /**
-     * Handle an incoming request.
-     *
-     * @param  Closure(Request): (Response)  $next
-     */
-    public function handle(Request $request, Closure $next, string $role): Response
+    // Đổi string $role thành ...$roles để nhận diện được mảng vai trò
+    public function handle(Request $request, Closure $next, ...$roles): Response
     {
-        // Kiểm tra xem user đã đăng nhập chưa
         if (!auth()->check()) {
             return redirect()->route('login');
         }
 
         $user = auth()->user();
 
-        // Kiểm tra tài khoản bị khóa (inactive)
         if ($user->status === 'inactive') {
             auth()->logout();
             return redirect()->route('login')->withErrors([
@@ -30,17 +24,18 @@ class CheckRole
             ]);
         }
 
-        // Kiểm tra sai vai trò (Role)
-        if ($user->role !== $role) {
-            // Điều hướng thông minh về đúng trang của vai trò hiện tại
-            return match($user->role) {
-                'admin'   => redirect()->route('admin.accounts.index'),
-                'teacher' => redirect()->route('teacher.attendance.index'),
-                'student' => redirect()->route('student.results.index'),
-                default   => redirect('/'),
-            };
+        // Kiểm tra xem vai trò của user có nằm trong danh sách được phép không
+        if (in_array($user->role, $roles)) {
+            return $next($request);
         }
 
-        return $next($request);
+        // Nếu sai vai trò, điều hướng thông minh về đúng phân hệ
+        return match($user->role) {
+            'admin'   => redirect()->route('admin.accounts.index'),
+            'teacher' => redirect()->route('teacher.dashboard'),
+            'student' => redirect()->route('student.dashboard'),
+            'ta'      => redirect()->route('ta.dashboard'),
+            default   => redirect('/'),
+        };
     }
 }

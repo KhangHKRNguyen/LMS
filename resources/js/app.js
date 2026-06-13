@@ -51,3 +51,14 @@ window.startCountdown = function(durationInSeconds, displayElementId, callbackOn
     
     return interval; // Trả về để có thể clear nếu nộp bài sớm
 };
+
+// Xử lý đóng mở Modal xác nhận chung của toàn hệ thống (Popup xóa/khóa)
+window.openArenaModal = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.style.display = 'flex';
+}
+
+window.closeArenaModal = function(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) modal.style.display = 'none';
+}

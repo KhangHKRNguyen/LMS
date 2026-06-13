@@ -15,7 +15,7 @@ return new class extends Migration
             $table->text('option_b')->nullable(); // Đáp án b
             $table->text('option_c')->nullable(); // Đáp án c
             $table->text('option_d')->nullable(); // Đáp án d
-            $table->string('correct_option'); // Đáp án đúng (A, B, C hoặc D)
+            $table->string('correct_option')->nullable(); // Đáp án đúng (A, B, C hoặc D)
             $table->string('type')->nullable(); // Loại câu hỏi
             $table->foreignId('assignment_id')->constrained('assignments')->onDelete('cascade'); // Mã bài tập
             $table->timestamps();

@@ -1,129 +1,250 @@
-<x-app-layout>
-    <div class="space-y-6">
-        <div class="flex items-center space-x-3">
-            <a href="{{ route('admin.classes.index') }}" class="text-slate-400 hover:text-slate-600">← Quay lại</a>
-            <div>
-                <h1 class="text-2xl font-bold text-slate-800">{{ $class->class_name }}</h1>
-                <p class="text-sm text-slate-500">{{ $class->room }} | {{ $class->start_time?->format('d/m/Y') }} — {{ $class->end_time?->format('d/m/Y') }}</p>
-            </div>
+@extends('layouts.admin')
+
+@section('title', 'Chi tiết thành viên lớp học')
+
+@section('admin_content')
+<div class="container-fluid py-4">
+    
+    {{-- Khối thông báo hệ thống --}}
+    @if(session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+    @if(session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
+    {{-- CONTAINER 1: DANH SÁCH THÀNH VIÊN LỚP --}}
+    <div id="memberListContainer" style="{{ isset($previewMembers) ? 'display: none;' : 'display: block;' }}">
+        <div class="mb-4">
+            <a href="{{ route('admin.classes.index') }}" class="text-decoration-none text-secondary fw-medium">
+                <i class="bi bi-arrow-left"></i> QUẢN LÝ LỚP HỌC - {{ $class->class_name }}
+            </a>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {{-- GÁN GIÁO VIÊN --}}
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
-                <h2 class="font-semibold text-slate-700 text-base">Giáo viên phụ trách</h2>
+        <div class="text-center mb-4">
+            <h4 class="fw-bold" style="letter-spacing: 0.5px; color: #990000 !important;">CHI TIẾT THÀNH VIÊN LỚP HỌC</h4>
+        </div>
 
-                @if($teacher)
-                    <div class="flex items-center justify-between bg-blue-50 rounded-lg px-4 py-3">
-                        <div>
-                            <p class="font-medium text-slate-800">{{ $teacher->name }}</p>
-                            <p class="text-xs text-slate-500">{{ $teacher->email }}</p>
-                        </div>
-                        <span class="text-xs text-blue-600 font-medium">Đang phụ trách</span>
-                    </div>
-                @else
-                    <p class="text-sm text-slate-400 italic">Chưa có giáo viên phụ trách.</p>
-                @endif
-
-                <form method="POST" action="{{ route('admin.classes.assign-teacher', $class) }}" class="flex gap-2">
-                    @csrf
-                    <select name="teacher_id" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <option value="">-- Chọn giáo viên --</option>
-                        @foreach($allTeachers as $t)
-                            <option value="{{ $t->id }}" @selected($teacher?->id === $t->id)>{{ $t->name }}</option>
-                        @endforeach
-                    </select>
-                    <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition">
-                        Gán
-                    </button>
-                </form>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div class="position-relative" style="width: 320px;">
+                <span class="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="text" class="form-control ps-5 border-secondary-subtle" placeholder="Tìm kiếm theo mã hoặc tên..." style="border-radius: 6px; height: 42px;">
             </div>
+            <button onclick="switchToAction('add')" class="btn fw-semibold shadow-sm" style="background-color: #FEE2E2; border: 1px solid #FCA5A5; color: #990000; padding: 8px 24px; border-radius: 4px;">
+                Thêm thành viên
+            </button>
+        </div>
 
-            {{-- THÊM HỌC VIÊN --}}
-            <div class="bg-white rounded-xl shadow-sm border border-slate-200 p-5 space-y-4">
-                <div class="flex items-center justify-between">
-                    <h2 class="font-semibold text-slate-700 text-base">Học viên ({{ $students->count() }})</h2>
-                    <button onclick="document.getElementById('modal-add-students').classList.remove('hidden')"
-                            class="bg-emerald-600 text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-emerald-700 transition">
-                        + Thêm học viên
-                    </button>
-                </div>
-
-                @if($students->isEmpty())
-                    <p class="text-sm text-slate-400 italic">Chưa có học viên nào trong lớp.</p>
-                @else
-                    <div class="space-y-2 max-h-64 overflow-y-auto">
-                        @foreach($students as $student)
-                        <div class="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
-                            <div>
-                                <p class="text-sm font-medium text-slate-800">{{ $student->name }}</p>
-                                <p class="text-xs text-slate-500">{{ $student->email }}</p>
-                            </div>
-                            <form method="POST" action="{{ route('admin.classes.remove-student', [$class, $student]) }}"
-                                  onsubmit="return confirm('Xóa {{ $student->name }} khỏi lớp?')">
-                                @csrf @method('DELETE')
-                                <button type="submit" class="text-red-500 hover:text-red-700 text-xs font-medium">Xóa</button>
-                            </form>
-                        </div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
+        <div class="table-responsive shadow-sm" style="border-radius: 8px;">
+            <table class="table m-0 text-center align-middle bg-white table-bordered">
+                <thead style="background-color: #990000; color: white;">
+                    <tr>
+                        <th style="width: 60px; padding: 12px;">#</th>
+                        <th>Mã thành viên</th>
+                        <th>Họ tên</th>
+                        <th>Chức vụ / Vai trò</th>
+                        <th style="width: 150px;">Hành động</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @forelse($members ?? [] as $index => $member)
+                        <tr>
+                            <td>{{ $index + 1 }}</td>
+                            <td><span class="fw-bold text-dark">{{ $member->id }}</span></td>
+                            <td>{{ $member->name }}</td>
+                            <td>
+                                <span class="badge {{ $member->role === 'teacher' ? 'bg-danger' : ($member->role === 'ta' ? 'bg-warning text-dark' : 'bg-primary') }}">
+                                    {{ $member->role_text }}
+                                </span>
+                            </td>
+                            <td>
+                                <form action="{{ route('admin.classes.members.remove', [$class->id, $member->id]) }}" method="POST" onsubmit="return confirm('Bạn có chắc chắn muốn xóa thành viên này khỏi lớp?')">
+                                    @csrf 
+                                    @method('DELETE')
+                                    <button type="submit" class="btn btn-sm fw-bold px-4 text-white btn-danger" style="border-radius: 4px; border: none;">Xóa</button>
+                                </form>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="5" class="py-4 text-muted">Lớp học hiện chưa có thành viên nào gán vào.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
         </div>
     </div>
 
-    {{-- MODAL THÊM HỌC VIÊN --}}
-    <div id="modal-add-students" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
-            <div class="flex items-center justify-between p-5 border-b border-slate-200">
-                <h3 class="font-semibold text-slate-800">Thêm học viên vào lớp</h3>
-                <button onclick="document.getElementById('modal-add-students').classList.add('hidden')"
-                        class="text-slate-400 hover:text-slate-600 text-xl font-bold">✕</button>
-            </div>
 
-            <form method="POST" action="{{ route('admin.classes.add-students', $class) }}" class="flex flex-col flex-1 overflow-hidden">
+    {{-- CONTAINER 2: VIEW CHỨC NĂNG THÊM THÀNH VIÊN --}}
+    <div id="addMemberContainer" style="{{ isset($previewMembers) ? 'display: block;' : 'display: none;' }}">
+        <div class="mb-4">
+            <button onclick="triggerBackWithCheck()" class="btn btn-link text-decoration-none text-secondary p-0 fw-medium">
+                <i class="bi bi-arrow-left"></i> Quay về danh sách
+            </button>
+        </div>
+
+        <div class="text-center mb-4">
+            <h4 class="fw-bold mb-1" style="color: #990000 !important;">THÊM THÀNH VIÊN VÀO LỚP</h4>
+            <p class="text-muted fw-semibold">Lớp học: {{ $class->class_name }}</p>
+        </div>
+
+        <div class="d-flex justify-content-center gap-2 mb-4">
+            <button id="tabSingleBtn" onclick="switchTab('single')" class="btn px-4 fw-bold shadow-sm" style="{{ isset($previewMembers) ? 'background-color: #FEE2E2; color: #990000; border: 1px solid #FCA5A5;' : 'background-color: #FDBA74; color: #7C2D12; border: 1px solid #F97316;' }}">
+                Thêm từng thành viên
+            </button>
+            <button id="tabBulkBtn" onclick="switchTab('bulk')" class="btn px-4 fw-bold shadow-sm" style="{{ isset($previewMembers) ? 'background-color: #FDBA74; color: #7C2D12; border: 1px solid #F97316;' : 'background-color: #FEE2E2; color: #990000; border: 1px solid #FCA5A5;' }}">
+                Thêm hàng loạt (Excel)
+            </button>
+        </div>
+
+        {{-- TAB 1: THÊM TỪNG THÀNH VIÊN --}}
+        <div id="tabSingleContent" class="mx-auto card p-4 shadow-sm border-0" style="max-width: 500px; background-color: #FFFBEB; {{ isset($previewMembers) ? 'display: none;' : 'display: block;' }}">
+            <form action="{{ route('admin.classes.members.add_single', $class->id) }}" method="POST">
                 @csrf
-                <div class="p-4 border-b border-slate-100">
-                    <input type="text" id="search-student" placeholder="Tìm theo tên hoặc email..."
-                           class="w-full border border-slate-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                           oninput="filterStudents(this.value)">
+                <div class="mb-3">
+                    <label class="form-label fw-bold text-dark">Nhập Mã số tài khoản (User ID)</label>
+                    <input type="text" id="singleMemberCode" name="id" class="form-control border-secondary-subtle" style="background-color: #FEF3C7; height: 44px;" placeholder="Ví dụ: M002174..." required>
                 </div>
-
-                <div id="student-list" class="overflow-y-auto flex-1 p-4 space-y-2">
-                    @forelse($availableStudents as $s)
-                    <label class="flex items-center space-x-3 p-2 rounded-lg hover:bg-slate-50 cursor-pointer student-item"
-                           data-name="{{ strtolower($s->name) }}" data-email="{{ strtolower($s->email) }}">
-                        <input type="checkbox" name="student_ids[]" value="{{ $s->id }}" class="rounded text-emerald-600">
-                        <div>
-                            <p class="text-sm font-medium text-slate-800">{{ $s->name }}</p>
-                            <p class="text-xs text-slate-500">{{ $s->email }}</p>
-                        </div>
-                    </label>
-                    @empty
-                    <p class="text-sm text-slate-400 italic text-center py-4">Không còn học viên nào để thêm.</p>
-                    @endforelse
-                </div>
-
-                <div class="p-4 border-t border-slate-200 flex space-x-3">
-                    <button type="submit" class="flex-1 bg-emerald-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-emerald-700 transition">
-                        Thêm vào lớp
-                    </button>
-                    <button type="button" onclick="document.getElementById('modal-add-students').classList.add('hidden')"
-                            class="flex-1 bg-slate-100 text-slate-700 py-2 rounded-lg text-sm font-medium hover:bg-slate-200 transition">
-                        Hủy
-                    </button>
+                <div class="text-center">
+                    <button type="submit" class="btn text-white fw-bold px-4 shadow-sm" style="background-color: #990000; height: 42px;">Xác nhận thêm</button>
                 </div>
             </form>
         </div>
-    </div>
 
-    <script>
-    function filterStudents(query) {
-        const q = query.toLowerCase();
-        document.querySelectorAll('.student-item').forEach(item => {
-            const match = item.dataset.name.includes(q) || item.dataset.email.includes(q);
-            item.style.display = match ? '' : 'none';
-        });
+        {{-- TAB 2: THÊM HÀNG LOẠT --}}
+        <div id="tabBulkContent" style="{{ isset($previewMembers) ? 'display: block;' : 'display: none;' }}">
+            <div class="card p-4 shadow-sm border-0 mx-auto mb-4" style="max-width: 650px; background-color: #F8FAFC;">
+                <form action="{{ route('admin.classes.members.preview', $class->id) }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                    <div class="d-flex align-items-center gap-3 justify-content-center mb-3">
+                        <input type="file" name="import_file" class="form-control" style="max-width: 400px; height: 42px;" required accept=".xlsx, .csv, .txt">
+                        <button type="submit" class="btn text-white fw-bold px-4" style="background-color: #990000; height: 42px;">Tải Lên</button>
+                    </div>
+                    <div class="text-center">
+                        <a href="{{ route('admin.classes.members.sample') }}" class="btn btn-sm btn-outline-dark fw-semibold px-4 py-2">
+                            <i class="bi bi-download"></i> Tải file Excel mẫu tại đây
+                        </a>
+                    </div>
+                </form>
+            </div>
+
+            {{-- HIỂN THỊ DANH SÁCH XEM TRƯỚC TỪ EXCEL --}}
+            @if(isset($previewMembers))
+            <div class="mt-4">
+                <div class="text-center mb-3">
+                    <h6 class="fw-bold text-danger" style="letter-spacing: 0.5px;">DANH SÁCH THÀNH VIÊN TRONG FILE XEM TRƯỚC</h6>
+                </div>
+                <div class="table-responsive shadow-sm rounded mb-4">
+                    <table class="table m-0 text-center align-middle bg-white table-bordered">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>#</th>
+                                <th>Mã tài khoản</th>
+                                <th>Họ tên</th>
+                                <th>Vai trò hệ thống</th>
+                                <th>Trạng thái kiểm tra</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($previewMembers as $index => $pMem)
+                            <tr>
+                                <td>{{ $index + 1 }}</td>
+                                <td class="fw-bold text-primary">{{ $pMem['id'] ?? '' }}</td>
+                                <td>{{ $pMem['name'] }}</td>
+                                <td>{{ $pMem['role_text'] }}</td>
+                                <td>
+                                    @if($pMem['is_valid'])
+                                        <span class="text-success fw-bold"><i class="bi bi-check-circle-fill"></i> Hợp lệ</span>
+                                    @else
+                                        <span class="text-danger fw-bold"><i class="bi bi-x-circle-fill"></i> {{ $pMem['status_text'] }}</span>
+                                    @endif
+                                </td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center mb-5">
+                    <form action="{{ route('admin.classes.members.store_bulk', $class->id) }}" method="POST">
+                        @csrf
+                        <input type="hidden" name="verified_data" value="{{ json_encode($previewMembers) }}">
+                        <button type="submit" class="btn btn-success fw-bold px-5 shadow-sm" style="height: 44px;">XÁC NHẬN LƯU VÀO LỚP HỌC</button>
+                    </form>
+                </div>
+            </div>
+            @endif
+        </div>
+    </div>
+</div>
+
+{{-- MODAL CẢNH BÁO KHI THOÁT --}}
+<div id="confirmExitModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 9999; justify-content: center; align-items: center;">
+    <div class="bg-white p-4 text-center rounded border" style="width: 440px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
+        <h5 class="fw-bold text-dark mb-4">Bạn có chắc chắn muốn hủy thao tác và quay lại danh sách?</h5>
+        <div class="d-flex justify-content-center gap-3">
+            <button onclick="forceExit()" class="btn btn-danger text-white px-4">Có, Thoát</button>
+            <button onclick="closeExitModal()" class="btn btn-light border px-4">Không</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    function switchToAction(mode) {
+        if(mode === 'add') {
+            document.getElementById('memberListContainer').style.display = 'none';
+            document.getElementById('addMemberContainer').style.display = 'block';
+        } else {
+            document.getElementById('addMemberContainer').style.display = 'none';
+            document.getElementById('memberListContainer').style.display = 'block';
+            window.location.href = "{{ route('admin.classes.members', $class->id) }}";
+        }
     }
-    </script>
-</x-app-layout>
+
+    function switchTab(tab) {
+        const singleBtn = document.getElementById('tabSingleBtn');
+        const bulkBtn = document.getElementById('tabBulkBtn');
+        const singleContent = document.getElementById('tabSingleContent');
+        const bulkContent = document.getElementById('tabBulkContent');
+
+        if(tab === 'single') {
+            singleBtn.style = "background-color: #FDBA74; color: #7C2D12; border: 1px solid #F97316;";
+            bulkBtn.style = "background-color: #FEE2E2; color: #990000; border: 1px solid #FCA5A5;";
+            singleContent.style.display = 'block';
+            bulkContent.style.display = 'none';
+        } else {
+            bulkBtn.style = "background-color: #FDBA74; color: #7C2D12; border: 1px solid #F97316;";
+            singleBtn.style = "background-color: #FEE2E2; color: #990000; border: 1px solid #FCA5A5;";
+            singleContent.style.display = 'none';
+            bulkContent.style.display = 'block';
+        }
+    }
+
+    function triggerBackWithCheck() {
+        const singleInput = document.getElementById('singleMemberCode') ? document.getElementById('singleMemberCode').value.trim() : "";
+        if(singleInput !== "") {
+            document.getElementById('confirmExitModal').style.display = 'flex';
+        } else {
+            switchToAction('list');
+        }
+    }
+
+    function closeExitModal() {
+        document.getElementById('confirmExitModal').style.display = 'none';
+    }
+
+    function forceExit() {
+        if(document.getElementById('singleMemberCode')) document.getElementById('singleMemberCode').value = "";
+        closeExitModal();
+        switchToAction('list');
+    }
+</script>
+@endsection

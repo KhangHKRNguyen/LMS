@@ -12,9 +12,8 @@ class StudentAnswer extends Model
     use HasFactory;
 
     protected $fillable = [
-        'selected_option',
-        'submission_id',
-        'question_id'
+        'selected_option', 'submission_id', 'question_id',
+        'answer_text', 'audio_path'
     ];
 
     /**

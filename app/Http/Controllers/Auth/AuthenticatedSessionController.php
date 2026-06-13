@@ -35,9 +35,14 @@ class AuthenticatedSessionController extends Controller
         // Điều hướng theo vai trò
         return match(auth()->user()->role) {
             'admin'   => redirect()->route('admin.accounts.index'),
-            'teacher' => redirect()->route('teacher.attendance.index'),
-            'student' => redirect()->route('student.results.index'),
-            default   => redirect()->intended('/dashboard'),
+
+            'teacher' => redirect()->route('teacher.dashboard'),
+
+            'student' => redirect()->route('student.dashboard'),
+
+            'ta'      => redirect()->route('ta.dashboard'),
+
+            default   => redirect('/'),
         };
     }
 

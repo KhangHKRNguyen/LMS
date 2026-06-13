@@ -1,98 +1,101 @@
-<x-app-layout>
-    <x-slot name="header">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-4">
-                <a href="{{ route('teacher.assignments.index') }}" class="inline-flex items-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition shadow-sm">
-                    <svg class="-ml-1 mr-1.5 h-5 w-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>
-                    </svg>
-                    Quay lại
+@extends('layouts.classroom')
+
+@section('title', 'Chi tiết bài tập đã giao')
+
+@section('classroom_content')
+<div class="container py-4">
+    <div class="mb-4 d-flex justify-content-between align-items-center">
+        <a href="{{ route('teacher.assignments.index') }}" class="text-decoration-none text-secondary fw-medium">
+            <i class="bi bi-arrow-left"></i> Quay lại danh sách lớp
+        </a>
+        <span class="badge {{ $assignment->is_visible ? 'bg-success' : 'bg-secondary' }} px-3 py-2">
+            Trạng thái: {{ $assignment->is_visible ? 'Đang mở hiển thị' : 'Đang ẩn với học sinh' }}
+        </span>
+    </div>
+
+    {{-- Cấu hình phân phối của Bài tập tại Lớp học này --}}
+    <div class="card shadow-sm border-0 mb-4" style="border-radius: 8px;">
+        <div class="card-body p-4 bg-white" style="border-left: 5px solid #990000; border-radius: 8px;">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <small class="text-muted text-uppercase fw-bold">Chi tiết bài kiểm tra được giao</small>
+                    <h4 class="fw-bold text-dark mt-1 mb-2">{{ $assignment->exam->title ?? $assignment->title }}</h4>
+                    <p class="text-muted m-0 fs-7">
+                        Hình thức: <strong class="text-primary">{{ method_exists($assignment, 'typeLabel') ? $assignment->typeLabel() : (($assignment->exam ?? null) ? $assignment->exam->typeLabel() : 'Trắc nghiệm') }}</strong> &nbsp;|&nbsp; 
+                        Lớp học nhận bài: <strong class="text-dark">{{ $assignment->courseClass->class_name }}</strong> &nbsp;|&nbsp;
+                        Số bài học viên đã nộp: <strong class="text-danger">{{ $assignment->submissions_count ?? 0 }} bài</strong>
+                    </p>
+                </div>
+                <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                    <span class="d-block text-muted small fw-medium">Hạn cuối nộp bài:</span>
+                    <span class="fw-bold text-danger fs-5">{{ $assignment->due_time ? $assignment->due_time->format('d/m/Y H:i') : 'Không giới hạn' }}</span>
+                </div>
+            </div>
+            
+            {{-- Nếu đề thi gốc trong ngân hàng đề có chứa file tài liệu đính kèm --}}
+            @if(($assignment->exam->file_path ?? $assignment->file_path))
+            <div class="mt-3 pt-3 border-top">
+                <a href="{{ route('teacher.exams.download', $assignment->exam_id) }}" class="btn btn-sm btn-outline-danger fw-bold">
+                    <i class="bi bi-download"></i> Tải đề bài / File nghe đính kèm từ Ngân hàng đề
                 </a>
-                <h2 class="text-xl font-semibold text-gray-800">Chi tiết bài tập</h2>
             </div>
-            <a href="{{ route('teacher.grades.submissions', $assignment) }}" class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 shadow-sm transition">
-                Xem bài nộp
-            </a>
-        </div>
-    </x-slot>
-
-    <div class="py-8">
-        <div class="mx-auto max-w-5xl space-y-6 px-4 sm:px-6 lg:px-8">
-            @if (session('success'))
-                <div class="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">{{ session('success') }}</div>
-            @endif
-
-            <div class="bg-white p-6 shadow-sm sm:rounded-lg">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <p class="text-sm text-gray-500">{{ $assignment->courseClass->class_name }}</p>
-                        <h3 class="mt-1 text-xl font-semibold text-gray-900">{{ $assignment->title }}</h3>
-                    </div>
-                    <span class="inline-flex w-fit rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700">{{ $assignment->typeLabel() }}</span>
-                </div>
-
-                <dl class="mt-6 grid gap-4 text-sm md:grid-cols-3">
-                    <div>
-                        <dt class="text-gray-500">Thời gian mở</dt>
-                        <dd class="mt-1 font-medium text-gray-900">{{ optional($assignment->open_time)->format('d/m/Y H:i') }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Hạn nộp</dt>
-                        <dd class="mt-1 font-medium text-gray-900">{{ optional($assignment->due_time)->format('d/m/Y H:i') }}</dd>
-                    </div>
-                    <div>
-                        <dt class="text-gray-500">Bài đã nộp</dt>
-                        <dd class="mt-1 font-medium text-gray-900">{{ $assignment->submissions_count }}</dd>
-                    </div>
-                </dl>
-
-                @if ($assignment->content)
-                    <div class="mt-6">
-                        <h4 class="font-medium text-gray-900">Yêu cầu</h4>
-                        <p class="mt-2 whitespace-pre-line text-sm text-gray-700">{{ $assignment->content }}</p>
-                    </div>
-                @endif
-
-                <div class="mt-6 flex flex-wrap gap-4 border-t border-slate-100 pt-6">
-                    @if ($assignment->file_path)
-                        <a href="{{ route('teacher.assignments.download-attachment', $assignment) }}" class="inline-flex items-center gap-2 rounded-xl bg-indigo-50 border border-indigo-200 px-4 py-2.5 text-sm font-semibold text-indigo-700 hover:bg-indigo-100 hover:text-indigo-800 transition shadow-sm">
-                            <svg class="h-5 w-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                            </svg>
-                            Tải file đề bài đính kèm
-                        </a>
-                    @endif
-
-                    @if ($assignment->isquiz())
-                        <a href="{{ route('teacher.assignments.export', $assignment) }}" download class="inline-flex items-center gap-2 rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800 transition shadow-sm">
-                            <svg class="h-5 w-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h7a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-                            </svg>
-                            Xuất danh sách câu hỏi (Excel/CSV)
-                        </a>
-                    @endif
-                </div>
-            </div>
-
-            @if ($assignment->isquiz())
-                <div class="bg-white p-6 shadow-sm sm:rounded-lg">
-                    <h3 class="font-semibold text-gray-900">Danh sách câu hỏi</h3>
-                    <div class="mt-4 space-y-4">
-                        @foreach ($assignment->questions as $question)
-                            <div class="rounded-md border border-gray-200 p-4">
-                                <p class="font-medium text-gray-900">{{ $loop->iteration }}. {{ $question->question_text }}</p>
-                                <div class="mt-3 grid gap-2 text-sm text-gray-700 md:grid-cols-2">
-                                    <p>A. {{ $question->option_a }}</p>
-                                    <p>B. {{ $question->option_b }}</p>
-                                    <p>C. {{ $question->option_c }}</p>
-                                    <p>D. {{ $question->option_d }}</p>
-                                </div>
-                                <p class="mt-3 text-sm font-medium text-green-700">Đáp án đúng: {{ $question->correct_option }}</p>
-                            </div>
-                        @endforeach
-                    </div>
-                </div>
             @endif
         </div>
     </div>
-</x-app-layout>
+
+    {{-- HIỂN THỊ NỘI DUNG CHI TIẾT ĐỀ THI LẤY TỪ NGÂN HÀNG ĐỀ --}}
+    @if(($assignment->exam ?? $assignment)->isEssay())
+        {{-- Khối tự luận (IELTS Writing / Speaking) --}}
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light fw-bold py-3 text-dark">
+                <i class="bi bi-file-earmark-text-fill text-danger me-2"></i>NỘI DUNG ĐỀ BÀI TỰ LUẬN
+            </div>
+            <div class="card-body p-4">
+                <div class="p-3 bg-light rounded text-dark" style="white-space: pre-line; line-height: 1.6;">
+                    {{ $assignment->exam->content ?? $assignment->content }}
+                </div>
+            </div>
+        </div>
+    @else
+        {{-- Khối trắc nghiệm (IELTS Listening / Reading / Grammar Quiz) --}}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold m-0 text-dark">
+                <i class="bi bi-list-ol text-danger me-2"></i>DANH SÁCH CÂU HỎI TRONG ĐỀ THI ĐÃ GIAO ({{ ($assignment->exam->questions ?? $assignment->questions)->count() }} câu)
+            </h5>
+            <a href="{{ route('teacher.exams.export', $assignment->exam_id) }}" class="btn btn-sm btn-success fw-bold">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Xuất File câu hỏi (.CSV)
+            </a>
+        </div>
+
+        {{-- Duyệt mảng câu hỏi từ quan hệ dữ liệu Ngân hàng đề gốc --}}
+        @forelse(($assignment->exam->questions ?? $assignment->questions) as $index => $question)
+        <div class="card shadow-sm border-0 mb-3" style="border-radius: 6px;">
+            <div class="card-body p-4">
+                <div class="d-flex justify-content-between align-items-start mb-3">
+                    <span class="fw-bold text-dark">Câu {{ $index + 1 }}: {{ $question->question_text }}</span>
+                    <span class="badge bg-light text-secondary border fw-medium px-2 py-1 fs-7">Trắc nghiệm</span>
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-6 py-2 px-3 rounded border {{ $question->correct_option === 'A' ? 'border-success bg-success-subtle text-success fw-bold' : 'bg-light text-dark' }}">
+                        <span class="me-2 fw-bold">A.</span> {{ $question->option_a }} {!! $question->correct_option === 'A' ? '<i class="bi bi-check-lg text-success ms-2"></i>' : '' !!}
+                    </div>
+                    <div class="col-md-6 py-2 px-3 rounded border {{ $question->correct_option === 'B' ? 'border-success bg-success-subtle text-success fw-bold' : 'bg-light text-dark' }}">
+                        <span class="me-2 fw-bold">B.</span> {{ $question->option_b }} {!! $question->correct_option === 'B' ? '<i class="bi bi-check-lg text-success ms-2"></i>' : '' !!}
+                    </div>
+                    <div class="col-md-6 py-2 px-3 rounded border {{ $question->correct_option === 'C' ? 'border-success bg-success-subtle text-success fw-bold' : 'bg-light text-dark' }}">
+                        <span class="me-2 fw-bold">C.</span> {{ $question->option_c }} {!! $question->correct_option === 'C' ? '<i class="bi bi-check-lg text-success ms-2"></i>' : '' !!}
+                    </div>
+                    <div class="col-md-6 py-2 px-3 rounded border {{ $question->correct_option === 'D' ? 'border-success bg-success-subtle text-success fw-bold' : 'bg-light text-dark' }}">
+                        <span class="me-2 fw-bold">D.</span> {{ $question->option_d }} {!! $question->correct_option === 'D' ? '<i class="bi bi-check-lg text-success ms-2"></i>' : '' !!}
+                    </div>
+                </div>
+            </div>
+        </div>
+        @empty
+        <div class="p-5 text-center bg-white rounded border text-muted fw-medium">
+            Bài kiểm tra trắc nghiệm này chưa có câu hỏi nào trong cơ sở dữ liệu gốc.
+        </div>
+        @endforelse
+    @endif
+</div>
+@endsection

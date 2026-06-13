@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class User extends Authenticatable
 {
@@ -16,16 +17,26 @@ class User extends Authenticatable
     const ROLE_ADMIN   = 'admin';
     const ROLE_TEACHER = 'teacher';
     const ROLE_STUDENT = 'student';
+    const ROLE_TA = 'ta';
 
     const STATUS_ACTIVE   = 'active';
     const STATUS_INACTIVE = 'inactive';
 
+    protected $keyType = 'string';
+    public $incrementing = false;
+
     protected $fillable = [
+        'id',
         'name',
         'email',
         'password',
         'role',
         'status',
+        'gender',
+        'birthday',
+        'phone',
+        'image',
+        'qualification',
     ];
 
     protected $hidden = [
@@ -54,6 +65,11 @@ class User extends Authenticatable
     public function isStudent(): bool
     {
         return $this->role === self::ROLE_STUDENT;
+    }
+
+    public function isTA(): bool
+    {
+        return $this->role === self::ROLE_TA;
     }
 
     public function isActive(): bool
@@ -107,5 +123,12 @@ class User extends Authenticatable
     public function classes(): BelongsToMany
     {
         return $this->belongsToMany(CourseClass::class, 'class_user', 'user_id', 'course_class_id')->withTimestamps();
+    }
+    /**
+     * Danh sách các đơn xin nghỉ do User này (TA/Admin) xử lý duyệt
+     */
+    public function receivedLeaveRequests(): HasMany
+    {
+        return $this->hasMany(LeaveRequest::class, 'receiver_id');
     }
 }

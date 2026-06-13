@@ -9,18 +9,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Question extends Model
 {
-    protected $table = 'questions';
     use HasFactory;
 
+    protected $table = 'questions';
+
     protected $fillable = [
-        'question_text',
-        'option_a',
-        'option_b',
-        'option_c',
-        'option_d',
-        'correct_option',
-        'type',
-        'assignment_id'
+        'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 
+        'correct_option', 'type', 'assignment_id', 'question_group',
+        'passage', 'audio_path'
     ];
 
     /**
@@ -28,7 +24,7 @@ class Question extends Model
      */
     public function assignment(): BelongsTo
     {
-        return $this->belongsTo(Assignment::class);
+        return $this->belongsTo(Assignment::class, 'assignment_id');
     }
 
     /**
@@ -36,6 +32,6 @@ class Question extends Model
      */
     public function studentAnswers(): HasMany
     {
-        return $this->hasMany(StudentAnswer::class);
+        return $this->hasMany(StudentAnswer::class, 'question_id');
     }
 }
