@@ -2,38 +2,7 @@
 
 @section('classroom_content')
 <div class="container-fluid m-0 p-0" style="min-height: 100vh; display: flex;">
-    
-    <div class="p-3" style="width: 250px; background-color: #FFF9E6; border-right: 2px solid #E6D9B8;">
-        <div class="d-flex flex-column gap-2">
-            <a href="#" class="btn w-100 text-left text-white py-2 px-3" style="background-color: #7A0C0C; border: 1px solid #7A0C0C; border-radius: 5px; font-weight: bold;">
-                Thông tin chung
-            </a>
-            <a href="#" class="btn w-100 text-left py-2 px-3" style="color: #7A0C0C; border: 1px solid #7A0C0C; background-color: white; border-radius: 5px; font-weight: bold; margin-top: 8px;">
-                Tài liệu
-            </a>
-            <a href="#" class="btn w-100 text-left py-2 px-3" style="color: #7A0C0C; border: 1px solid #7A0C0C; background-color: white; border-radius: 5px; font-weight: bold; margin-top: 8px;">
-                Danh sách học viên
-            </a>
-            <a href="#" class="btn w-100 text-left py-2 px-3" style="color: #7A0C0C; border: 1px solid #7A0C0C; background-color: white; border-radius: 5px; font-weight: bold; margin-top: 8px;">
-                Giao bài
-            </a>
-            <a href="#" class="btn w-100 text-left py-2 px-3" style="color: #7A0C0C; border: 1px solid #7A0C0C; background-color: white; border-radius: 5px; font-weight: bold; margin-top: 8px;">
-                Bài nộp
-            </a>
-            <a href="#" class="btn w-100 text-left py-2 px-3" style="color: #7A0C0C; border: 1px solid #7A0C0C; background-color: white; border-radius: 5px; font-weight: bold; margin-top: 8px;">
-                Kết quả tổng kết
-            </a>
-        </div>
-    </div>
-
     <div class="flex-grow-1 p-4 bg-white">
-        <div class="d-flex align-items-center mb-4">
-            <a href="{{ route('teacher.classes.index') }}" class="text-dark mr-3" style="font-size: 1.5rem; text-decoration: none;">
-                <i class="fas fa-arrow-left"></i> &larr;
-            </a>
-            <h4 class="m-0" style="font-weight: bold; color: #000;">LỚP HỌC - {{ $class->class_name ?? 'N/A' }}</h4>
-        </div>
-
         <h5 style="font-weight: bold; margin-top: 20px;">Lớp học</h5>
         <div class="row g-3 mb-4">
             <div class="col-md-3">

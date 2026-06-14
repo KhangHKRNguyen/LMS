@@ -57,7 +57,7 @@
                 </td>
 
                 <td>
-                    <a href="{{ route('teacher.assignments.index', ['class_id' => $class->id]) }}"
+                    <a href="{{ route('teacher.classes.show', $class->id) }}"
                     class="btn btn-sm text-white px-3"
                     style="background-color: #4A90E2; border-radius: 5px;">
                         Chi tiết

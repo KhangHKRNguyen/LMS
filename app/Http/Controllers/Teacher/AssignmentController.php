@@ -15,20 +15,19 @@ use Illuminate\Support\Str;
 
 class AssignmentController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        // Lấy danh sách các lớp học thuộc về giáo viên này, nạp kèm các bài tập đã giao trong lớp đó
-        $classes = CourseClass::whereHas('users', function ($query) {
-            $query->where('user_id', Auth::id());
-        })
-        ->with(['assignments' => function($query) {
-            $query->latest(); // Sắp xếp bài tập mới giao lên đầu
+        // Lấy class_id từ URL (?class_id=1)
+        $classId = $request->query('class_id');
+
+        // Tìm lớp học cụ thể và nạp kèm bài tập, đếm sĩ số để nuôi Sidebar
+        $class = CourseClass::with(['assignments' => function($q) {
+            $q->with('exam');
         }])
         ->withCount('students')
-        ->get();
+        ->findOrFail($classId);
 
-        // Truyền biến $classes ra đúng như View đang chờ đợi
-        return view('teacher.assignments.index', compact('classes'));
+        return view('teacher.assignments.index', compact('class'));
     }
 
     public function create()

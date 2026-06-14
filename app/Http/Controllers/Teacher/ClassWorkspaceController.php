@@ -21,6 +21,6 @@ class ClassWorkspaceController extends Controller
             }
         ])->findOrFail($id);
 
-        return view('teacher.classes.show', compact('class'));
+        return view('teacher.classes.info', compact('class'));
     }
 }

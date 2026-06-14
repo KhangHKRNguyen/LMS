@@ -69,6 +69,6 @@ class ClassroomController extends Controller
         });
 
         // 5. Trả dữ liệu ra ngoài View
-        return view('teacher.classroom.students', compact('courseClass', 'students'));
+        return view('teacher.students.index', compact('courseClass', 'students'));
     }
 }

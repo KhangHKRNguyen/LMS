@@ -102,6 +102,6 @@ class ClassroomSummaryController extends Controller
                 : 0
         ];
 
-        return view('teacher.classroom.summary', compact('courseClass', 'studentsPaginator', 'stats'));
+        return view('teacher.summary.index', compact('courseClass', 'studentsPaginator', 'stats', 'assignments', 'midtermIds', 'finalIds'));
     }
 }

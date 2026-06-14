@@ -5,7 +5,8 @@
 @section('classroom_content')
 <div class="container py-4">
     <div class="text-center mb-5">
-        <h3 class="fw-bold text-danger" style="letter-spacing: 1px;">QUẢN LÝ BÀI TẬP THEO LỚP HỌC</h3>
+        {{-- Gọi trực tiếp tên lớp học --}}
+        <h3 class="fw-bold text-danger" style="letter-spacing: 1px;">QUẢN LÝ BÀI TẬP - {{ $class->class_name }}</h3>
         <p class="text-muted fw-medium">Xem các bài tập đang hiển thị hoặc khởi tạo cấu hình giao bài từ ngân hàng đề</p>
     </div>
 
@@ -16,17 +17,17 @@
         </div>
     @endif
 
-    @foreach($classes as $class)
+    {{-- Không dùng vòng lặp nữa, hiển thị trực tiếp Card của lớp đó --}}
     <div class="card shadow-sm border-0 mb-5" style="border-radius: 8px;">
         <div class="card-header bg-light py-3 d-flex justify-content-between align-items-center border-0">
             <div>
                 <h5 class="fw-bold text-dark m-0"><i class="bi bi-door-open-fill text-danger me-2"></i>{{ $class->class_name }}</h5>
                 <small class="text-muted fw-medium">
-                    Sĩ số: <strong class="text-dark">{{ $class->students_count }} học viên</strong> | Tổng số: {{ $class->assignments_count ?? $class->assignments->count() }} bài tập đã giao
+                    Sĩ số: <strong class="text-dark">{{ $class->students_count }} học viên</strong> | Tổng số: {{ $class->assignments->count() }} bài tập đã giao
                 </small>
             </div>
-            {{-- Nút điều hướng sang ngân hàng đề để giáo viên lựa chọn bài muốn giao --}}
-            <a href="{{ route('teacher.assignments.index') }}" class="btn text-white fw-bold btn-sm px-3" style="background-color: #990000;">
+            
+            <a href="{{ route('teacher.assignments.create', $class->id) }}" class="btn text-white fw-bold btn-sm px-3" style="background-color: #990000;">
                 <i class="bi bi-plus-lg"></i> GIAO BÀI TẬP TỪ NGÂN HÀNG ĐỀ
             </a>
         </div>
@@ -50,7 +51,6 @@
                             @foreach($class->assignments as $idx => $assignment)
                             <tr>
                                 <td>{{ $idx + 1 }}</td>
-                                {{-- Lấy tiêu đề trực tiếp từ quan hệ liên kết đề thi gốc --}}
                                 <td style="text-align: left; padding-left: 20px;" class="fw-bold text-dark">
                                     {{ $assignment->exam->title ?? $assignment->title }}
                                 </td>
@@ -90,6 +90,5 @@
             @endif
         </div>
     </div>
-    @endforeach
 </div>
 @endsection
