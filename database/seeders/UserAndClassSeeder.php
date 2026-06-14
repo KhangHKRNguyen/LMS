@@ -5,312 +5,361 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Carbon\Carbon;
 
 class UserAndClassSeeder extends Seeder
 {
+    /**
+     * Seed the application's database.
+     */
     public function run(): void
     {
-        // 1. ĐỔ DỮ LIỆU BẢNG: users (Cập nhật thêm thông tin profile cá nhân)
+        // ==========================================
+        // 1. SEED BẢNG VAI TRÒ (ROLES) - ĐỦ 4 ROLE CỦA HỆ THỐNG
+        // ==========================================
+        DB::table('roles')->insert([
+            ['id' => 1, 'name' => 'admin', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'name' => 'teacher', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'name' => 'assistant', 'created_at' => now(), 'updated_at' => now()], // Trợ lý lớp học (TA)
+            ['id' => 4, 'name' => 'student', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // ==========================================
+        // 2. SEED BẢNG KỸ NĂNG (SKILLS)
+        // ==========================================
+        DB::table('skills')->insert([
+            ['id' => 1, 'name' => 'Listening', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'name' => 'Reading', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'name' => 'Writing', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 4, 'name' => 'Speaking', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // ==========================================
+        // 3. SEED BẢNG TRÌNH ĐỘ (QUALIFICATIONS)
+        // ==========================================
+        DB::table('qualifications')->insert([
+            ['id' => 1, 'expert_level' => 'IELTS 7.5 Certificate', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'expert_level' => 'IELTS 8.5 Master', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // ==========================================
+        // 4. SEED BẢNG LOẠI BÀI TẬP (ASSIGNMENT_TYPES)
+        // ==========================================
+        DB::table('assignment_types')->insert([
+            ['id' => 1, 'name' => 'Homework', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'name' => 'On-class', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'name' => 'Mid-term', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 4, 'name' => 'Final', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // ==========================================
+        // 5. SEED BẢNG NGƯỜI DÙNG & TÀI KHOẢN (USERS) - 4 ACCOUNT CHO 4 ROLE
+        // ==========================================
+        // Mật khẩu đồng bộ cho tất cả tài khoản: 12345678
         DB::table('users')->insert([
             [
                 'id' => 1,
-                'name' => 'Nguyễn Admin',
+                'name' => 'Quản trị viên Hệ thống',
+                'gender' => 'Nam',
+                'dob' => '1995-01-01',
+                'phone' => '0912345678',
+                'avatar' => null,
                 'email' => 'admin@gmail.com',
                 'password' => Hash::make('12345678'),
-                'role' => 'admin',
                 'status' => 'active',
-                'gender' => 'Nam', 'birthday' => '1995-05-20', 'phone' => '0912345678', 'qualification' => 'Manager',
+                'role_id' => 1, // Admin
+                'qualification_id' => null,
                 'created_at' => now(), 'updated_at' => now()
             ],
             [
                 'id' => 2,
-                'name' => 'Trần Giảng Viên',
+                'name' => 'Thầy Nguyễn Học Anh',
+                'gender' => 'Nam',
+                'dob' => '1990-05-15',
+                'phone' => '0988888888',
+                'avatar' => null,
                 'email' => 'giangvien@gmail.com',
                 'password' => Hash::make('12345678'),
-                'role' => 'teacher',
                 'status' => 'active',
-                'gender' => 'Nam', 'birthday' => '1988-10-15', 'phone' => '0988888888', 'qualification' => 'IELTS 8.5',
+                'role_id' => 2, // Teacher
+                'qualification_id' => 2,
                 'created_at' => now(), 'updated_at' => now()
             ],
             [
                 'id' => 3,
-                'name' => 'Lê Học Viên A',
+                'name' => 'Cô Lê Trợ Lý (TA)',
+                'gender' => 'Nữ',
+                'dob' => '2001-08-25',
+                'phone' => '0966666666',
+                'avatar' => null,
+                'email' => 'troly@gmail.com',
+                'password' => Hash::make('12345678'),
+                'status' => 'active',
+                'role_id' => 3, // Assistant (TA)
+                'qualification_id' => 1,
+                'created_at' => now(), 'updated_at' => now()
+            ],
+            [
+                'id' => 4,
+                'name' => 'Trần Văn Học Viên',
+                'gender' => 'Nam',
+                'dob' => '2004-10-20',
+                'phone' => '0977777777',
+                'avatar' => null,
                 'email' => 'hocviena@gmail.com',
                 'password' => Hash::make('12345678'),
-                'role' => 'student',
                 'status' => 'active',
-                'gender' => 'Nữ', 'birthday' => '2002-01-01', 'phone' => '0977777777', 'qualification' => 'Target 7.0',
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            [
-                'id' => 4,
-                'name' => 'Phạm Học Viên B',
-                'email' => 'hocvienb@gmail.com',
-                'password' => Hash::make('12345678'),
-                'role' => 'student',
-                'status' => 'active',
-                'gender' => 'Nam', 'birthday' => '2001-08-24', 'phone' => '0966666666', 'qualification' => 'Target 6.5',
+                'role_id' => 4, // Student
+                'qualification_id' => null,
                 'created_at' => now(), 'updated_at' => now()
             ]
         ]);
 
-        // 2. ĐỔ DỮ LIỆU BẢNG: courses (Danh mục khóa học tổng thể trước khi mở lớp)
+        // ==========================================
+        // 6. SEED KHÓA HỌC & LỚP HỌC (COURSES & CLASSES)
+        // ==========================================
         DB::table('courses')->insert([
-            ['id' => 1, 'name' => 'IELTS Masterclass 7.0+', 'description' => 'Khóa học đột phá band điểm nâng cao', 'output_target' => '7.0', 'duration' => '3 tháng', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'name' => 'IELTS Intensive Reading & Listening', 'description' => 'Tập trung chuyên sâu 2 kỹ năng nghe đọc', 'output_target' => '6.5', 'duration' => '2 tháng', 'created_at' => now(), 'updated_at' => now()]
+            'id' => 1,
+            'name' => 'Khóa luyện thi IELTS Chuyên Sâu 6.5+',
+            'description' => 'Khóa học bứt tốc giúp học viên nắm vững kỹ năng xử lý cả 4 đề thi IELTS.',
+            'output_target' => 'Cam kết đầu ra tối thiểu IELTS Band 6.5',
+            'duration' => '48',
+            'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 3. ĐỔ DỮ LIỆU BẢNG: course_classes
         DB::table('course_classes')->insert([
-            [
-                'id' => 1,
-                'class_name' => 'Luyện Writing',
-                'start_time' => now(),
-                'end_time' => now()->addMonths(3),
-                'room' => 'Phòng 402-A2',
-                'course_id' => 1,
-                'status' => 'Đang mở',
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            [
-                'id' => 2,
-                'class_name' => 'Luyện giao tiếp căn bản',
-                'start_time' => now(),
-                'end_time' => now()->addMonths(3),
-                'room' => 'Phòng 301-B1',
-                'course_id' => 2,
-                'status' => 'Đang mở',
-                'created_at' => now(), 'updated_at' => now()
-            ]
+            'id' => 1,
+            'class_name' => 'Lớp IELTS-6.5-K20',
+            'start_date' => Carbon::now()->format('Y-m-d'),
+            'end_date' => Carbon::now()->addMonths(3)->format('Y-m-d'),
+            'room' => 'Phòng Lab 202',
+            'status' => 'active',
+            'course_id' => 1,
+            'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 4. ĐỔ DỮ LIỆU BẢNG TRUNG GIAN: class_user (Gán người dùng vào lớp)
+        // Gán Giảng viên (2), Trợ lý (3) và Học viên (4) vào lớp (1)
         DB::table('class_user')->insert([
-            ['course_class_id' => 1, 'user_id' => 2, 'created_at' => now(), 'updated_at' => now()], 
-            ['course_class_id' => 1, 'user_id' => 3, 'created_at' => now(), 'updated_at' => now()], 
-            ['course_class_id' => 1, 'user_id' => 4, 'created_at' => now(), 'updated_at' => now()], 
-            ['course_class_id' => 2, 'user_id' => 2, 'created_at' => now(), 'updated_at' => now()], 
-            ['course_class_id' => 2, 'user_id' => 3, 'created_at' => now(), 'updated_at' => now()], 
+            ['course_class_id' => 1, 'user_id' => 2, 'created_at' => now(), 'updated_at' => now()],
+            ['course_class_id' => 1, 'user_id' => 3, 'created_at' => now(), 'updated_at' => now()],
+            ['course_class_id' => 1, 'user_id' => 4, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        // 5. ĐỔ DỮ LIỆU BẢNG: lesson_sessions (Tạo các buổi học thực tế để quản lý chuyên sâu)
+        // ==========================================
+        // 7. SEED THÔNG BÁO (NOTIFICATIONS & RECIPIENTS)
+        // ==========================================
+        DB::table('notifications')->insert([
+            'id' => 1,
+            'title' => 'Chào mừng đến với lớp học mới!',
+            'content' => 'Hệ thống đã thêm bạn vào lớp IELTS-6.5-K20. Hãy kiểm tra lịch học nhé.',
+            'sender_id' => 1, // Admin gửi
+            'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        DB::table('notification_recipients')->insert([
+            ['notification_id' => 1, 'user_id' => 4, 'is_read' => false, 'created_at' => now(), 'updated_at' => now()], // Gửi cho học viên
+            ['notification_id' => 1, 'user_id' => 2, 'is_read' => true, 'created_at' => now(), 'updated_at' => now()],  // Gửi bản copy cho GV
+        ]);
+
+        // ==========================================
+        // 8. SEED BUỔI HỌC & CHUYÊN CẦN (LESSON_SESSIONS, ATTENDANCES, LEAVE_REQUESTS)
+        // ==========================================
+        // Tạo 2 buổi học (Buổi 1 đã diễn ra, Buổi 2 sắp diễn ra)
         DB::table('lesson_sessions')->insert([
-            ['id' => 1, 'course_class_id' => 1, 'session_date' => now()->subDays(1)->format('Y-m-d'), 'attendance_status' => 'Đã điểm danh', 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'course_class_id' => 1, 'session_date' => now()->format('Y-m-d'), 'attendance_status' => 'Chưa điểm danh', 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 1, 'lesson_date' => Carbon::now()->subDays(2)->format('Y-m-d'), 'course_class_id' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'lesson_date' => Carbon::now()->addDays(2)->format('Y-m-d'), 'course_class_id' => 1, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        // 6. ĐỔ DỮ LIỆU BẢNG: leave_requests (Đơn nghỉ học gắn liền với buổi học cụ thể)
-        DB::table('leave_requests')->insert([
-            [
-                'id' => 1,
-                'request_date' => now()->format('Y-m-d'),
-                'reason' => 'Em bị ốm phải đi khám bệnh, xin phép thầy cho em nghỉ ạ.',
-                'lesson_session_id' => 1,
-                'user_id' => 3, 
-                'receiver_id' => 1,
-                'file_path' => 'uploads/evidence/giay_kham_benh.pdf',
-                'status' => 'Đã duyệt',
-                'created_at' => now(), 'updated_at' => now()
-            ]
-        ]);
-
-        // 7. ĐỔ DỮ LIỆU BẢNG: attendances (Điểm danh thuộc về buổi học số 1)
+        // Trợ lý hoặc giảng viên điểm danh buổi 1: Học viên đi học đầy đủ ('present')
         DB::table('attendances')->insert([
-            ['id' => 1, 'attendance_date' => now()->subDays(1)->format('Y-m-d'), 'status' => 'Có mặt', 'lesson_session_id' => 1, 'user_id' => 3, 'created_at' => now(), 'updated_at' => now()],
-            ['id' => 2, 'attendance_date' => now()->subDays(1)->format('Y-m-d'), 'status' => 'Muộn', 'lesson_session_id' => 1, 'user_id' => 4, 'created_at' => now(), 'updated_at' => now()],
+            'id' => 1,
+            'status' => 'present', 
+            'user_id' => 4, // Học viên
+            'lesson_session_id' => 1,
+            'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 8. ĐỔ DỮ LIỆU BẢNG: materials (Tài liệu học tập)
-        DB::table('materials')->insert([
-            [
-                'id' => 1,
-                'title' => 'Slide Chương 1: Tổng quan về IELTS',
-                'file_path' => 'uploads/materials/slide1.pdf',
-                'course_class_id' => 1,
-                'created_at' => now(), 'updated_at' => now()
-            ]
+        // Học viên làm đơn xin nghỉ trước cho buổi học số 2
+        DB::table('leave_requests')->insert([
+            'id' => 1,
+            'reason' => 'Em có lịch thi học kỳ trùng vào ngày học này, mong thầy cô cho phép em xem lại record sau ạ.',
+            'status' => 'pending', // Đang chờ duyệt
+            'user_id' => 4,
+            'lesson_session_id' => 2,
+            'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 9. ĐỔ DỮ LIỆU BẢNG: assignments (Tích hợp các trường IELTS Arena nâng cao)
+        // ==========================================
+        // 9. SEED TÀI LIỆU LỚP HỌC (DOCUMENTS)
+        // ==========================================
+        DB::table('documents')->insert([
+            'id' => 1,
+            'title' => 'Cẩm nang chiến thuật IELTS Reading & Listening Band 7.0+',
+            'file_path' => 'documents/cam_nang_ielts_65.pdf',
+            'course_class_id' => 1,
+            'user_id' => 2, // Do giảng viên tải lên
+            'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        // ==========================================
+        // 10. SEED ĐỀ THI MẪU & PHÂN PHỐI BÀI TẬP (ASSIGNMENTS)
+        // ==========================================
         DB::table('assignments')->insert([
-            [
-                'id' => 1,
-                'title' => 'IELTS Mock Test Full 4 Skills - Khảo sát chất lượng Tháng 10',
-                'content' => 'Bài thi tổng hợp kiểm tra toàn diện năng lực học viên bao gồm đầy đủ các định dạng câu hỏi Nghe, Nói, Đọc, Viết.',
-                'type' => 'Full Test',
-                'skill' => 'all', // Đầy đủ kỹ năng
-                'audio_path' => 'uploads/audio/full_mock_test_2026.mp3', // File nghe tổng cho phần Listening
-                'passage' => 'The Evolution of Digital Education in 21st Century...', // Văn bản tổng hoặc cấu trúc đề
-                'open_time' => now(),
-                'due_time' => now()->addDays(7),
-                'duration_minutes' => 180, // 180 phút làm bài liên tục
-                'course_class_id' => 1,
-                'is_visible' => true,
-                'created_at' => now(), 'updated_at' => now()
-            ]
+            'id' => 1,
+            'title' => 'IELTS Mini Test - Đề tổng hợp 4 kỹ năng số 01',
+            'description' => 'Bài kiểm tra tiến độ định kỳ 4 kỹ năng chuẩn cấu trúc IELTS.',
+            'file_path' => null,
+            'assignment_type_id' => 2, // Mini Test
+            'user_id' => 2,
+            'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 10. ĐỔ DỮ LIỆU BẢNG: questions (Gom nhóm câu hỏi theo chuẩn IELTS Part)
+        DB::table('assignment_distributions')->insert([
+            'id' => 1,
+            'duration_minutes' => 60,
+            'open_time' => now(),
+            'close_time' => Carbon::now()->addDays(7),
+            'max_attempts' => 2,
+            'status' => 'Đang mở',
+            'lesson_session_id' => 1,
+            'assignment_id' => 1,
+            'user_id' => 2,
+            'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        // ==========================================
+        // 11. SEED CÂU HỎI & ĐÁP ÁN GỐC (QUESTIONS, OPTIONS, KEYWORDS)
+        // ==========================================
+        // Câu 1: Reading (Trắc nghiệm)
         DB::table('questions')->insert([
-            // DẠNG 1: LISTENING - TRẮC NGHIỆM (MCQ)
-            [
-                'id' => 1,
-                'question_text' => 'Theo file nghe Listening Section 1, người đàn ông muốn đặt lịch hẹn vào ngày thứ mấy?',
-                'option_a' => 'Monday', 'option_b' => 'Wednesday', 'option_c' => 'Friday', 'option_d' => 'Saturday',
-                'correct_option' => 'B',
-                'type' => 'Single Choice',
-                'assignment_id' => 1,
-                'question_group' => 'Listening - Section 1',
-                'passage' => null, 'audio_path' => null,
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            // DẠNG 2: READING - TRUE / FALSE / NOT GIVEN
-            [
-                'id' => 2,
-                'question_text' => 'Do các trường đại học trực tuyến phát triển, các trường đại học truyền thống sẽ biến mất hoàn toàn vào năm 2030.',
-                'option_a' => 'True', 'option_b' => 'False', 'option_c' => 'Not Given', 'option_d' => null,
-                'correct_option' => 'B',
-                'type' => 'TFNG',
-                'assignment_id' => 1,
-                'question_group' => 'Reading - Passage 1',
-                'passage' => 'While online learning platforms have surged in popularity, traditional institutions continue to adapt and thrive, debunking the myth of their total extinction.', 
-                'audio_path' => null,
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            // DẠNG 3: READING - ĐIỀN TỪ VÀO CHỖ TRỐNG (Gap-filling)
-            [
-                'id' => 3,
-                'question_text' => 'Học viên trực tuyến cần có tinh thần tự giác cao vì họ không có sự giám sát trực tiếp từ _______.',
-                'option_a' => null, 'option_b' => null, 'option_c' => null, 'option_d' => null,
-                'correct_option' => 'teachers', // Từ khóa đúng lưu ở đây để hệ thống tự check
-                'type' => 'Fill in the blank',
-                'assignment_id' => 1,
-                'question_group' => 'Reading - Passage 1',
-                'passage' => 'Distance learners must cultivate high levels of self-discipline, given the absence of physical enforcement from teachers.',
-                'audio_path' => null,
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            // DẠNG 4: WRITING TASK 1 (Tự luận viết - Mô tả biểu đồ)
-            [
-                'id' => 4,
-                'question_text' => 'The chart below shows the percentage of households with internet access in different regions between 2015 and 2025. Summarize the information...',
-                'option_a' => null, 'option_b' => null, 'option_c' => null, 'option_d' => null,
-                'correct_option' => null,
-                'type' => 'Writing Task 1',
-                'assignment_id' => 1,
-                'question_group' => 'Writing Section',
-                'passage' => '[Link ảnh biểu đồ: uploads/images/writing_task1_chart.png]', // Prompt đề bài viết
-                'audio_path' => null,
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            // DẠNG 5: WRITING TASK 2 (Tự luận viết - Essay nghị luận)
-            [
-                'id' => 5,
-                'question_text' => 'Some people believe that artificial intelligence will completely replace human teachers in the future. To what extent do you agree or disagree?',
-                'option_a' => null, 'option_b' => null, 'option_c' => null, 'option_d' => null,
-                'correct_option' => null,
-                'type' => 'Writing Task 2',
-                'assignment_id' => 1,
-                'question_group' => 'Writing Section',
-                'passage' => 'Write an essay of at least 250 words.',
-                'audio_path' => null,
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            // DẠNG 6: SPEAKING PART 2 (Tự luận nói - Thu âm trực tiếp)
-            [
-                'id' => 6,
-                'question_text' => 'Describe a website you visit frequently. You should say: What it is, How often you visit it, What content it has, and explain why you find it useful.',
-                'option_a' => null, 'option_b' => null, 'option_c' => null, 'option_d' => null,
-                'correct_option' => null,
-                'type' => 'Speaking Part 2',
-                'assignment_id' => 1,
-                'question_group' => 'Speaking Section',
-                'passage' => 'You will have 1 minute to prepare and 2 minutes to record your speech.',
-                'audio_path' => null,
-                'created_at' => now(), 'updated_at' => now()
-            ]
+            'id' => 1, 'question_number' => 1, 'question_type' => 'trac_nghiem',
+            'question_text' => 'According to paragraph 2, what is the main reason for global warming?',
+            'points' => 2.50, 'max_recording_time' => null, 'assignment_id' => 1, 'skill_id' => 2, 'created_at' => now(), 'updated_at' => now()
+        ]);
+        DB::table('question_options')->insert([
+            ['id' => 1, 'option_letter' => 'A', 'option_content' => 'Deforestation.', 'is_correct' => false, 'question_id' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'option_letter' => 'B', 'option_content' => 'Excessive CO2 emissions.', 'is_correct' => true, 'question_id' => 1, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 3, 'option_letter' => 'C', 'option_content' => 'Solar cycles.', 'is_correct' => false, 'question_id' => 1, 'created_at' => now(), 'updated_at' => now()],
         ]);
 
-        // 11. ĐỔ DỮ LIỆU BẢNG: submissions (Chấm điểm trực tiếp 4 kỹ năng và Overall)
+        // Câu 2: Listening (Điền từ)
+        DB::table('questions')->insert([
+            'id' => 2, 'question_number' => 2, 'question_type' => 'dien_tu',
+            'question_text' => 'The facility opens in [ô trống 1] and fee is [ô trống 2] dollars.',
+            'points' => 2.50, 'max_recording_time' => null, 'assignment_id' => 1, 'skill_id' => 1, 'created_at' => now(), 'updated_at' => now()
+        ]);
+        DB::table('question_keywords')->insert([
+            ['id' => 1, 'blank_order' => 1, 'correct_keyword' => 'October', 'question_id' => 2, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'blank_order' => 2, 'correct_keyword' => '15', 'question_id' => 2, 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // Câu 3: Writing (Tự luận)
+        DB::table('questions')->insert([
+            'id' => 3, 'question_number' => 3, 'question_type' => 'writing',
+            'question_text' => 'Discuss the impacts of technology on traditional education.',
+            'points' => 2.50, 'max_recording_time' => null, 'assignment_id' => 1, 'skill_id' => 3, 'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        // Câu 4: Speaking (Ghi âm)
+        DB::table('questions')->insert([
+            'id' => 4, 'question_number' => 4, 'question_type' => 'speaking',
+            'question_text' => 'Describe a beautiful place you have visited.',
+            'points' => 2.50, 'max_recording_time' => 120, 'assignment_id' => 1, 'skill_id' => 4, 'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        // ==========================================
+        // 12. SEED BÀI NỘP CỦA HỌC VIÊN (SUBMISSIONS) - CHỨA ĐẦY ĐỦ 4 CỘT ĐIỂM THÀNH PHẦN
+        // ==========================================
         DB::table('submissions')->insert([
-            [
-                'id' => 1,
-                'submission_content' => 'Học viên nộp bài thi thử Mock Test tháng 10',
-                'file_path' => 'uploads/submissions/mocktest_hocviena.pdf',
-                'grade' => 7.0,          // Điểm OVERALL
-                'listening_score' => 7.5, // Điểm Nghe
-                'reading_score' => 7.0,   // Điểm Đọc
-                'writing_score' => 6.5,   // Điểm Viết
-                'speaking_score' => 7.0,  // Điểm Nói
-                'teacher_comment' => 'Kỹ năng nghe đọc khá tốt. Viết cần chú ý triển khai ý sâu hơn.',
-                'status' => 'Đã chấm',
-                'assignment_id' => 1,
-                'user_id' => 3,
-                'created_at' => now(), 'updated_at' => now()
-            ],
-            [
-                'id' => 2,
-                'submission_content' => 'Bài làm của Học viên B',
-                'file_path' => null,
-                'grade' => 6.0,          // Điểm OVERALL
-                'listening_score' => 6.0, // Điểm Nghe
-                'reading_score' => 6.5,   // Điểm Đọc
-                'writing_score' => 5.5,   // Điểm Viết
-                'speaking_score' => 6.0,  // Điểm Nói
-                'teacher_comment' => 'Điểm viết hơi thấp do lỗi ngữ pháp nhiều. Cần luyện tập thêm.',
-                'status' => 'Đã chấm',
-                'assignment_id' => 1,
-                'user_id' => 4,
-                'created_at' => now(), 'updated_at' => now()
-            ]
+            'id' => 1,
+            'submission_time' => now(),
+            // Điểm thành phần chi tiết của 4 kỹ năng IELTS
+            'listening_grade' => 7.50,
+            'reading_grade' => 8.00,
+            'writing_grade' => 6.00,
+            'speaking_grade' => 6.50,
+            'total_grade' => 7.00, // Điểm Overall trung bình cộng làm tròn theo quy chế IELTS
+            'teacher_comment' => 'Kỹ năng Đọc và Nghe rất tốt. Bài viết cần trau chuốt thêm từ vựng học thuật. Phát âm tự nhiên.',
+            'attempt_number' => 1,
+            'status' => 'graded', // Đã chấm điểm
+            'user_id' => 4, // Học viên nộp
+            'assignment_distribution_id' => 1,
+            'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 12. ĐỔ DỮ LIỆU BẢNG: student_answers (Chi tiết bài làm tương ứng với từng kiểu câu hỏi)
-        DB::table('student_answers')->insert([
-            // Trả lời câu 1 (Nghe trắc nghiệm) -> Chọn đúng C
-            ['id' => 1, 'question_id' => 1, 'submission_id' => 1, 'selected_option' => 'B', 'answer_text' => null, 'audio_path' => null, 'created_at' => now(), 'updated_at' => now()],
-            
-            // Trả lời câu 2 (Đọc T/F/NG) -> Chọn đúng False
-            ['id' => 2, 'question_id' => 2, 'submission_id' => 1, 'selected_option' => 'False', 'answer_text' => null, 'audio_path' => null, 'created_at' => now(), 'updated_at' => now()],
-            
-            // Trả lời câu 3 (Điền từ vào chỗ trống) -> Điền văn bản ngắn
-            ['id' => 3, 'question_id' => 3, 'submission_id' => 1, 'selected_option' => null, 'answer_text' => 'teachers', 'audio_path' => null, 'created_at' => now(), 'updated_at' => now()],
-            
-            // Trả lời câu 4 (Writing Task 1) -> Lưu nguyên bài luận miêu tả biểu đồ dài
-            [
-                'id' => 4, 'question_id' => 4, 'submission_id' => 1, 'selected_option' => null, 
-                'answer_text' => 'The provided bar chart illustrates the proportion of households holding internet connectivity across various geographic regions over a ten-year period starting from 2015...', 
-                'audio_path' => null, 'created_at' => now(), 'updated_at' => now()
-            ],
-            
-            // Trả lời câu 5 (Writing Task 2) -> Lưu nguyên bài Essay nghị luận xã hội
-            [
-                'id' => 5, 'question_id' => 5, 'submission_id' => 1, 'selected_option' => null, 
-                'answer_text' => 'In contemporary society, the integration of artificial intelligence into classrooms has sparked an intense debate. While some technocrats argue that AI mentors could surpass human teachers...', 
-                'audio_path' => null, 'created_at' => now(), 'updated_at' => now()
-            ],
-            
-            // Trả lời câu 6 (Speaking Part 2) -> Lưu đường dẫn file âm thanh học viên bấm ghi âm trực tiếp
-            [
-                'id' => 6, 'question_id' => 6, 'submission_id' => 1, 'selected_option' => null, 'answer_text' => null, 
-                'audio_path' => 'uploads/submissions/speaking_test_u3_q6.mp3', 
-                'created_at' => now(), 'updated_at' => now()
-            ]
+        // ==========================================
+        // 13. SEED CHI TIẾT ĐÁP ÁN BÀI LÀM CỦA HỌC VIÊN CHO TỪNG DẠNG
+        // ==========================================
+        // Trắc nghiệm (Chọn đáp án trúng B là đáp án đúng)
+        DB::table('answers_multiple_choice')->insert([
+            'id' => 1,
+            'submission_id' => 1, 'question_id' => 1, 'question_option_id' => 2,
+            'created_at' => now(), 'updated_at' => now()
         ]);
 
-        // 13. ĐỔ DỮ LIỆU BẢNG: feedback (Học viên gửi khiếu nại điểm số)
-        DB::table('feedback')->insert([
-            [
-                'id' => 1,
-                'feedback_content' => 'Thầy ơi tiêu chí LR (Từ vựng) em có dùng các từ idiom và từ C1/C2, thầy xem xét phúc khảo lại giúp em band này với ạ.',
-                'old_grade' => 6.50,
-                'new_grade' => 7.00,
-                'teacher_reply' => 'Đã xem xét lại bài viết, các cụm từ collocations dùng rất tự nhiên. Thầy cập nhật lại điểm tổng lên 7.0 nhé.',
-                'teacher_replied_at' => now(),
-                'submission_id' => 2,
-                'user_id' => 3,
-                'created_at' => now(), 'updated_at' => now()
-            ]
+        // Điền từ (Học viên điền đúng 2 từ khóa)
+        DB::table('answers_fill_blank')->insert([
+            'id' => 1, 'submission_id' => 1, 'question_id' => 2, 'created_at' => now(), 'updated_at' => now()
+        ]);
+        DB::table('answer_fill_blank_details')->insert([
+            ['answer_fill_blank_id' => 1, 'blank_order' => 1, 'student_input' => 'October', 'created_at' => now(), 'updated_at' => now()],
+            ['answer_fill_blank_id' => 1, 'blank_order' => 2, 'student_input' => '15', 'created_at' => now(), 'updated_at' => now()],
+        ]);
+
+        // Bài viết luận (Writing)
+        DB::table('answers_writing')->insert([
+            'id' => 1,
+            'essay_content' => 'In recent years, technology has revolutionized the education system in various ways...',
+            'submission_id' => 1, 'question_id' => 3,
+            'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        // File ghi âm âm thanh (Speaking)
+        DB::table('answers_speaking')->insert([
+            'id' => 1,
+            'audio_file_path' => 'audio/submissions/student_4_q4.mp3',
+            'submission_id' => 1, 'question_id' => 4,
+            'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        // ==========================================
+        // 14. SEED PHẢN HỒI & LỊCH SỬ SỬA ĐIỂM (FEEDBACKS & GRADE_HISTORIES)
+        // ==========================================
+        DB::table('feedbacks')->insert([
+            'id' => 1,
+            'content' => 'Thầy đánh giá rất cao sự tiến bộ của em ở bài Mock Test lần này, cố gắng phát huy!',
+            'submission_id' => 1,
+            'user_id' => 2, // Giảng viên phản hồi
+            'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        DB::table('grade_histories')->insert([
+            'id' => 1,
+            'old_grade' => 6.00, // Điểm trước đó
+            'new_grade' => 7.00,  // Điểm sau khi lưu
+            'reason' => 'Giảng viên hoàn thành chấm điểm thi thử lần 2',
+            'submission_id' => 1,
+            'question_id' => 1,
+            'user_id' => 2, // Người thực hiện chấm/sửa
+            'created_at' => now(), 'updated_at' => now()
+        ]);
+
+        // ==========================================
+        // 15. SEED BẢNG KẾT QUẢ TỔNG HỢP (LEARNING_RESULTS)
+        // ==========================================
+        DB::table('learning_results')->insert([
+            'id' => 1,
+            'user_id' => 4,
+            'course_class_id' => 1,
+            
+            // ĐỔI THÀNH CÁC CỘT CÓ TRONG MIGRATION CỦA BẠN
+            'midterm_grade' => 7.00,  // Điểm giữa khóa
+            'final_grade' => 8.00,    // Điểm cuối khóa (nullable, có thể truyền hoặc bỏ qua)
+            'approved_date' => now()->toDateString(), 
+            'approval_status' => 'Đã duyệt', 
+            
+            'created_at' => now(), 
+            'updated_at' => now()
         ]);
     }
 }

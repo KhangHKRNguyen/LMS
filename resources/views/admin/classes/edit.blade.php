@@ -25,12 +25,13 @@
                 </div>
 
                 <div class="col-md-12">
-                    <label class="form-label fw-semibold text-secondary">Khóa học chuyên môn <span class="text-danger">*</span></label>
-                    <select class="form-select" name="course_id" style="height: 44px;">
+                    <label class="form-label fw-semibold text-secondary text-muted">Khóa học chuyên môn (Khóa)</label>
+                    <select class="form-select bg-light text-muted" style="height: 44px;" disabled>
                         @foreach($courses as $course)
                             <option value="{{ $course->id }}" {{ old('course_id', $class->course_id) == $course->id ? 'selected' : '' }}>{{ $course->name }}</option>
                         @endforeach
                     </select>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-lock-fill"></i> Không thể thay đổi khóa học sau khi đã tạo lớp.</small>
                 </div>
 
                 <div class="col-md-12">
@@ -39,15 +40,15 @@
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold text-secondary">Ngày bắt đầu <span class="text-danger">*</span></label>
-                    <input type="date" class="form-control @error('start_time') is-invalid @enderror" name="start_time" value="{{ old('start_time', $class->start_time?->format('Y-m-d')) }}" style="height: 44px;">
-                    @error('start_time') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    <label class="form-label fw-semibold text-secondary text-muted">Ngày bắt đầu (Khóa)</label>
+                    <input type="date" class="form-control bg-light text-muted" value="{{ $class->start_date?->format('Y-m-d') }}" style="height: 44px;" disabled>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-lock-fill"></i> Không được phép sửa ngày bắt đầu.</small>
                 </div>
 
                 <div class="col-md-6">
-                    <label class="form-label fw-semibold text-secondary">Ngày kết thúc <span class="text-danger">*</span></label>
-                    <input type="date" class="form-control @error('end_time') is-invalid @enderror" name="end_time" value="{{ old('end_time', $class->end_time?->format('Y-m-d')) }}" style="height: 44px;">
-                    @error('end_time') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    <label class="form-label fw-semibold text-secondary text-muted">Ngày kết thúc (Khóa)</label>
+                    <input type="date" class="form-control bg-light text-muted" value="{{ $class->end_date?->format('Y-m-d') }}" style="height: 44px;" disabled>
+                    <small class="text-muted d-block mt-1"><i class="bi bi-lock-fill"></i> Không được phép sửa ngày kết thúc tự động.</small>
                 </div>
 
                 <div class="col-md-12">

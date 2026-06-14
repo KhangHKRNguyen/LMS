@@ -5,13 +5,6 @@
 @section('admin_content')
 <div class="container-fluid py-4">
     
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show shadow-sm" role="alert">
-            <i class="bi bi-check-circle-fill me-2"></i> {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
-
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h4 class="fw-bold m-0" style="color: #990000; letter-spacing: 0.5px;">QUẢN LÝ DANH SÁCH LỚP HỌC</h4>
         <a href="{{ route('admin.classes.create') }}" class="btn text-white fw-semibold shadow-sm" style="background-color: #990000; padding: 10px 24px; border-radius: 4px;">
@@ -66,18 +59,29 @@
                             </span>
                         </td>
                         <td><span class="text-muted">{{ $class->room ?? 'Chưa xếp phòng' }}</span></td>
-                        <td style="font-size: 13px;" class="text-secondary fw-medium">
-                            {{ $class->start_time?->format('d/m/Y') }} <i class="bi bi-arrow-right text-danger mx-1"></i> {{ $class->end_time?->format('d/m/Y') }}
+                        <td>
+                            @if($class->start_date && $class->end_date)
+                                <div class="fw-medium text-dark small">
+                                    {{ $class->start_date->format('d/m/Y') }} - {{ $class->end_date->format('d/m/Y') }}
+                                </div>
+                            @else
+                                <span class="text-muted small"><i>Chưa cập nhật</i></span>
+                            @endif
                         </td>
                         <td>
-                            <span class="badge {{ $class->status == 'Đang mở' ? 'bg-success-subtle text-success' : 'bg-secondary-subtle text-secondary' }} px-3 py-2">
-                                {{ $class->status }}
-                            </span>
+                            @if(strtolower($class->status) == 'active' || $class->status == 'Đang mở')
+                                <span class="badge rounded-pill px-3 py-1.5 fw-bold" style="background-color: #2ec4b6; color: #fff; font-size: 0.75rem; letter-spacing: 0.3px;">
+                                    <i class="" style="font-size: 0.5rem; vertical-align: middle;"></i> HOẠT ĐỘNG
+                                </span>
+                            @else
+                                <span class="badge rounded-pill bg-warning text-dark px-3 py-1.5 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.3px;">
+                                    TẠM DỪNG
+                                </span>
+                            @endif
                         </td>
-                        <td class="fw-bold">
-                            <span class="text-primary">{{ $class->students_count }} Học viên</span> 
-                            <br>
-                            <small class="text-muted">({{ $class->assignments_count }} Bài tập)</small>
+                        <td>
+                            <div class="fw-semibold text-dark">{{ $class->students_count }}</div>
+                            <small class="text-muted">học viên</small>
                         </td>
                         <td>
                             <div class="d-flex justify-content-center gap-2">

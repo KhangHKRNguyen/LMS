@@ -35,20 +35,43 @@
                 </div>
 
                 <div class="col-md-12">
+                    <label class="form-label fw-semibold text-secondary">Lịch học hàng tuần (Tích chọn các ngày học) <span class="text-danger">*</span></label>
+                    <div class="d-flex flex-wrap gap-3 p-3 border rounded bg-light">
+                        @foreach([
+                            1 => 'Thứ 2',
+                            2 => 'Thứ 3',
+                            3 => 'Thứ 4',
+                            4 => 'Thứ 5',
+                            5 => 'Thứ 6',
+                            6 => 'Thứ 7'
+                        ] as $value => $label)
+                            <div class="form-check">
+                                <input class="form-check-input @error('days_of_week') is-invalid @enderror" 
+                                    type="checkbox" 
+                                    name="days_of_week[]" 
+                                    value="{{ $value }}" 
+                                    id="day_{{{ $value }}}"
+                                    {{ is_array(old('days_of_week')) && in_array($value, old('days_of_week')) ? 'checked' : '' }}>
+                                <label class="form-check-label fw-medium" for="day_{{{ $value }}}">
+                                    {{ $label }}
+                                </label>
+                            </div>
+                        @endforeach
+                    </div>
+                    @error('days_of_week') 
+                        <div class="text-danger small mt-1">{{ $message }}</div> 
+                    @enderror
+                </div>
+
+                <div class="col-md-12">
                     <label class="form-label fw-semibold text-secondary">Phòng học / Địa điểm học</label>
                     <input type="text" class="form-control" name="room" placeholder="Ví dụ: Phòng 402-A2 hoặc Link Zoom..." style="height: 44px;" value="{{ old('room') }}">
                 </div>
 
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold text-secondary">Ngày bắt đầu <span class="text-danger">*</span></label>
+                <div class="col-md-12">
+                    <label class="form-label fw-semibold text-secondary">Ngày bắt đầu lớp học <span class="text-danger">*</span></label>
                     <input type="date" class="form-control @error('start_time') is-invalid @enderror" name="start_time" style="height: 44px;" value="{{ old('start_time') }}">
                     @error('start_time') <div class="invalid-feedback">{{ $message }}</div> @enderror
-                </div>
-
-                <div class="col-md-6">
-                    <label class="form-label fw-semibold text-secondary">Ngày kết thúc <span class="text-danger">*</span></label>
-                    <input type="date" class="form-control @error('end_time') is-invalid @enderror" name="end_time" style="height: 44px;" value="{{ old('end_time') }}">
-                    @error('end_time') <div class="invalid-feedback">{{ $message }}</div> @enderror
                 </div>
 
                 <div class="col-md-12">

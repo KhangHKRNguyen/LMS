@@ -7,14 +7,6 @@
     <h3 class="text-danger fw-bold" style="letter-spacing: 1px;">DANH SÁCH TÀI KHOẢN</h3>
 </div>
 
-{{-- Hiển thị thông báo Alert nếu có thành công/thất bại --}}
-@if(session('success'))
-    <div class="alert alert-success">{{ session('success') }}</div>
-@endif
-@if(session('error'))
-    <div class="alert alert-danger">{{ session('error') }}</div>
-@endif
-
 <div class="d-flex justify-content-between align-items-center mb-4">
     {{-- Form Tìm kiếm thực tế --}}
     <form method="GET" action="{{ route('admin.accounts.index') }}" class="position-relative" style="width: 320px;">

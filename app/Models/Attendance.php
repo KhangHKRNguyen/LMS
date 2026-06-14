@@ -9,7 +9,7 @@ class Attendance extends Model
     protected $table = 'attendances';
 
     protected $fillable = [
-        'attendance_date', 'status', 'user_id', 
+        'status', 'user_id', 
         'lesson_session_id' // Khóa ngoại mới chuyển đổi từ lớp sang buổi học
     ];
 

@@ -22,26 +22,25 @@
         </a>
 
         {{-- 2. TÀI LIỆU (Thư mục: teacher/materials/document.blade.php) --}}
-        <a href="{{ route('teacher.materials.index', ['class_id' => $class->id]) }}"
+        <a href="{{ route('teacher.materials.index', ['class' => $class->id ?? request()->route('class')]) }}"
            class="sidebar-menu-item {{ Request::routeIs('teacher.materials.*') ? 'active' : '' }}">
             TÀI LIỆU
         </a>
 
         {{-- 3. DANH SÁCH HỌC VIÊN (Thư mục: teacher/students/index.blade.php) --}}
-        <a href="{{ route('teacher.classroom.students', $class->id) }}"
+        <a href="{{ route('teacher.classroom.students', ['class' => $class->id ?? request()->route('class')]) }}"
            class="sidebar-menu-item {{ Request::routeIs('teacher.classroom.students') ? 'active' : '' }}">
             DANH SÁCH HỌC VIÊN
         </a>
 
-        {{-- 4. GIAO BÀI (Thư mục: teacher/assignments/create.blade.php) --}}
-        <a href="{{ route('teacher.assignments.create', $class->id) }}"
-           class="sidebar-menu-item {{ Request::routeIs('teacher.assignments.create') ? 'active' : '' }}">
+        {{-- 4. GIAO BÀI --}}
+        <a href="{{ route('teacher.assignments.global_index', ['class_id' => $class->id ?? request()->route('class')]) }}"
+        class="sidebar-menu-item {{ Request::routeIs('teacher.assignments.global_index') ? 'active' : '' }}">
             GIAO BÀI
         </a>
 
-        {{-- 5. BÀI NỘP / CHẤM ĐIỂM (Thư mục: teacher/submissions/index.blade.php) 
-             Lưu ý: Bạn cần kiểm tra chính xác tên route hiển thị danh sách bài nộp của bạn là gì (ví dụ: teacher.submissions.index hoặc teacher.grades.index) --}}
-        <a href="{{ route('teacher.assignments.index', ['class_id' => $class->id]) }}"
+        {{-- 5. BÀI NỘP / CHẤM ĐIỂM --}}
+        <a href="{{ route('teacher.assignments.index', $class->id ?? request()->route('class')) }}"
            class="sidebar-menu-item {{ (Request::routeIs('teacher.assignments.index') || Request::routeIs('teacher.submissions.*')) ? 'active' : '' }}">
             BÀI NỘP
         </a>

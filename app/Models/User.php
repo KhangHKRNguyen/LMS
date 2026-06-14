@@ -2,41 +2,32 @@
 
 namespace App\Models;
 
-use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Casts\Attribute;
 
 class User extends Authenticatable
 {
     use HasFactory, Notifiable;
 
-    const ROLE_ADMIN   = 'admin';
-    const ROLE_TEACHER = 'teacher';
-    const ROLE_STUDENT = 'student';
-    const ROLE_TA = 'ta';
-
     const STATUS_ACTIVE   = 'active';
     const STATUS_INACTIVE = 'inactive';
-
-    protected $keyType = 'string';
-    public $incrementing = false;
-
+    protected $appends = ['role_text'];
     protected $fillable = [
         'id',
         'name',
         'email',
         'password',
-        'role',
+        'role_id',          // Đồng bộ theo bảng roles mới
         'status',
         'gender',
-        'birthday',
+        'dob',              // Thay cho birthday cũ
         'phone',
-        'image',
-        'qualification',
+        'avatar',           // Thay cho image cũ
+        'qualification_id', // Thay cho qualification cũ
     ];
 
     protected $hidden = [
@@ -49,27 +40,59 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password'          => 'hashed',
+            'dob'               => 'date',
         ];
     }
 
+    // Liên kết tới bảng Roles mới
+    public function roleRelation(): BelongsTo
+    {
+        return $this->belongsTo(Role::class, 'role_id');
+    }
+
+    /**
+     * ACCESSOR ĐỒNG BỘ NGƯỢC (BACKWARD COMPATIBILITY):
+     * Khi gọi $account->role ở View, nó tự động trả về chuỗi 'admin', 'teacher', 'ta', 'student'
+     * giúp giao diện Blade cũ chạy mượt mà không lo bị lỗi Crash.
+     */
+    public function getRoleAttribute(): string
+    {
+        $roleName = $this->roleRelation?->name;
+        return $roleName === 'assistant' ? 'ta' : ($roleName ?? 'student');
+    }
+
+    public function getRoleTextAttribute(): string
+    {
+        $roleId = $this->role_id;
+        
+        return match($roleId) {
+            1 => 'Quản trị viên',
+            2 => 'Giảng viên',
+            3 => 'Trợ giảng',
+            4 => 'Học viên',
+            default => 'Không xác định'
+        };
+    }
+
+    // Sửa các helper kiểm tra quyền dựa trên role_id trong Seeder
     public function isAdmin(): bool
     {
-        return $this->role === self::ROLE_ADMIN;
+        return $this->role_id == 1;
     }
 
     public function isTeacher(): bool
     {
-        return $this->role === self::ROLE_TEACHER;
-    }
-
-    public function isStudent(): bool
-    {
-        return $this->role === self::ROLE_STUDENT;
+        return $this->role_id == 2;
     }
 
     public function isTA(): bool
     {
-        return $this->role === self::ROLE_TA;
+        return $this->role_id == 3;
+    }
+
+    public function isStudent(): bool
+    {
+        return $this->role_id == 4;
     }
 
     public function isActive(): bool
@@ -77,58 +100,13 @@ class User extends Authenticatable
         return $this->status === self::STATUS_ACTIVE;
     }
 
-    /**
-     * Quan hệ 1-N: User có nhiều LeaveRequests (Đơn xin nghỉ)
-     */
-    public function leaveRequests(): HasMany
-    {
-        return $this->hasMany(LeaveRequest::class);
-    }
-
-    /**
-     * Quan hệ 1-N: User có nhiều Submissions (Bài nộp)
-     */
-    public function submissions(): HasMany
-    {
-        return $this->hasMany(Submission::class);
-    }
-
-    /**
-     * Quan hệ 1-N: User có nhiều Attendances (Lịch sử điểm danh)
-     */
-    public function attendances(): HasMany
-    {
-        return $this->hasMany(Attendance::class);
-    }
-
-    /**
-     * Quan hệ 1-N: Người dùng gửi nhiều phản hồi
-     */
-    public function feedbacks(): HasMany
-    {
-        return $this->hasMany(Feedback::class);
-    }
-
-    /**
-     * Quan hệ N-N: User có nhiều CourseClasses
-     */
     public function courseClasses(): BelongsToMany
     {
         return $this->belongsToMany(CourseClass::class, 'class_user', 'user_id', 'course_class_id')->withTimestamps();
     }
 
-    /**
-     * Quan hệ N-N: User có nhiều CourseClasses
-     */
     public function classes(): BelongsToMany
     {
         return $this->belongsToMany(CourseClass::class, 'class_user', 'user_id', 'course_class_id')->withTimestamps();
-    }
-    /**
-     * Danh sách các đơn xin nghỉ do User này (TA/Admin) xử lý duyệt
-     */
-    public function receivedLeaveRequests(): HasMany
-    {
-        return $this->hasMany(LeaveRequest::class, 'receiver_id');
     }
 }

@@ -12,8 +12,8 @@
             TRANG CHỦ
         </a>
 
-        <a href="{{ route('teacher.assignments.index') }}"
-            class="sidebar-menu-item {{ Request::routeIs('teacher.assignments.*') ? 'active' : '' }}">
+        <a href="{{ route('teacher.exams.index') }}"
+            class="sidebar-menu-item {{ Request::routeIs('teacher.exams.*') ? 'active' : '' }}">
             NGÂN HÀNG ĐỀ
         </a>
     </div>

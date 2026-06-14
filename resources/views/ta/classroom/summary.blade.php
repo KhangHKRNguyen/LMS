@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.lms')
 
 @section('title', 'Kết quả tổng kết lớp học - TA')
 

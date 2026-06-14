@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.lms')
 
 @section('title', 'Danh sách lớp học phụ trách')
 

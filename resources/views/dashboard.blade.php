@@ -1,17 +1,23 @@
-<x-app-layout>
-    <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 leading-tight">
-            {{ __('Dashboard') }}
-        </h2>
-    </x-slot>
+@extends('layouts.lms')
 
-    <div class="py-12">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900">
-                    {{ __("You're logged in!") }}
-                </div>
+@section('title', 'Tổng quan - Arena LMS')
+
+@section('content')
+<div class="container mt-5">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card border-0 shadow-sm P-4">
+                <h2 class="h4">Chào mừng bạn trở lại, {{ Auth::user()->name }}!</h2>
+                <p class="text-muted">Bạn đã đăng nhập thành công vào hệ thống Arena LMS.</p>
+                
+                <form method="POST" action="{{ route('logout') }}">
+                    @csrf
+                    <button type="submit" class="btn btn-danger btn-sm">
+                        <i class="bi bi-box-arrow-right"></i> Đăng xuất
+                    </button>
+                </form>
             </div>
         </div>
     </div>
-</x-app-layout>
+</div>
+@endsection

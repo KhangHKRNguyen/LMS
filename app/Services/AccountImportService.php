@@ -136,7 +136,7 @@ class AccountImportService
             $source = $hasHeader ? $this->mapHeaderRow($header, $row) : $this->mapFixedRow($row);
             $line = $hasHeader ? $index + 2 : $index + 1;
 
-            // ĐÃ ĐỔI: Kiểm tra trường bắt buộc theo khóa 'id' thay vì 'user_code'
+            // Kiểm tra trường bắt buộc theo khóa 'id'
             foreach (['id', 'name', 'email', 'role'] as $field) {
                 if (trim((string) ($source[$field] ?? '')) === '') {
                     throw ValidationException::withMessages(['import_file' => "Dòng {$line}: Thiếu dữ liệu của trường bắt buộc."]);
@@ -145,15 +145,17 @@ class AccountImportService
 
             // Chuẩn hóa quyền (Role)
             $role = Str::lower(trim((string)$source['role']));
+            
+            // ĐÃ SỬA: Thay đổi từ gọi Hằng số không tồn tại sang chuỗi String chuẩn khớp với Controller
             $role = match($role) {
-                'giảng viên', 'giang vien', 'teacher' => User::ROLE_TEACHER,
-                'trợ lý', 'tro ly', 'ta' => User::ROLE_TA,
-                'học viên', 'hoc vien', 'student' => User::ROLE_STUDENT,
-                'admin', 'quản trị' => User::ROLE_ADMIN,
+                'giảng viên', 'giang vien', 'teacher' => 'teacher',
+                'trợ lý', 'tro ly', 'ta', 'assistant' => 'ta',
+                'học viên', 'hoc vien', 'student'    => 'student',
+                'admin', 'quản trị'                   => 'admin',
                 default => throw ValidationException::withMessages(['import_file' => "Dòng {$line}: Vai trò '{$role}' không hợp lệ."])
             };
 
-            // ĐÃ ĐỔI: Định dạng key trả ra thành 'id' phục vụ View & Controller
+            // Định dạng dữ liệu trả ra cho View & Controller xử lý tiếp
             $accounts[] = [
                 'id'    => trim((string) $source['id']),
                 'name'  => trim((string) $source['name']),
@@ -177,7 +179,7 @@ class AccountImportService
     private function mapFixedRow(array $row): array
     {
         return [
-            'id'    => $row[0] ?? '', // ĐÃ ĐỔI
+            'id'    => $row[0] ?? '',
             'name'  => $row[1] ?? '',
             'email' => $row[2] ?? '',
             'role'  => $row[3] ?? '',
@@ -192,11 +194,10 @@ class AccountImportService
     private function canonicalKey(string $key): string
     {
         return match ($key) {
-            // ĐÃ ĐỔI: Toàn bộ từ khóa tương tự mã tài khoản quy về đích duy nhất là 'id'
             'id', 'ma', 'ma_tai_khoan', 'user_code', 'ma_nhan_su' => 'id',
-            'ho_ten', 'ten', 'name', 'full_name'           => 'name',
-            'email', 'thu_dien_tu'                          => 'email',
-            'vai_tro', 'role', 'chuc_vu'                    => 'role',
+            'ho_ten', 'ten', 'name', 'full_name'                 => 'name',
+            'email', 'thu_dien_tu'                                => 'email',
+            'vai_tro', 'role', 'chuc_vu'                          => 'role',
             default => $key,
         };
     }

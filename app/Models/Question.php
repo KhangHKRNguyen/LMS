@@ -2,36 +2,43 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Question extends Model
 {
-    use HasFactory;
-
     protected $table = 'questions';
 
     protected $fillable = [
-        'question_text', 'option_a', 'option_b', 'option_c', 'option_d', 
-        'correct_option', 'type', 'assignment_id', 'question_group',
-        'passage', 'audio_path'
+        'question_number', 
+        'question_type', 
+        'question_text', 
+        'points', 
+        'max_recording_time', 
+        'assignment_id', 
+        'skill_id'
     ];
 
-    /**
-     * Quan hệ N-1: Question thuộc 1 Assignment (Bài tập)
-     */
     public function assignment(): BelongsTo
     {
         return $this->belongsTo(Assignment::class, 'assignment_id');
     }
 
-    /**
-     * Quan hệ 1-N: Question có nhiều StudentAnswers (Đáp án học viên)
-     */
-    public function studentAnswers(): HasMany
+    public function skill(): BelongsTo
     {
-        return $this->hasMany(StudentAnswer::class, 'question_id');
+        return $this->belongsTo(Skill::class, 'skill_id');
+    }
+
+    // Các phương án lựa chọn (Cho dạng câu hỏi Trắc nghiệm)
+    public function options(): HasMany
+    {
+        return $this->hasMany(QuestionOption::class, 'question_id');
+    }
+
+    // Các từ khóa đáp án (Cho dạng câu hỏi Điền từ)
+    public function keywords(): HasMany
+    {
+        return $this->hasMany(QuestionKeyword::class, 'question_id')->orderBy('blank_order', 'asc');
     }
 }

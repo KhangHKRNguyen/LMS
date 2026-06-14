@@ -12,7 +12,9 @@ class Material extends Model
     protected $fillable = [
         'title',
         'file_path',
-        'course_class_id'
+        'course_class_id',
+        'user_id',    // Nên bổ sung thêm các trường này vào fillable nếu sau này có dùng Material::create()
+        'file_type'
     ];
 
     /**
@@ -21,5 +23,10 @@ class Material extends Model
     public function courseClass(): BelongsTo
     {
         return $this->belongsTo(CourseClass::class);
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }

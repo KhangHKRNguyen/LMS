@@ -15,16 +15,6 @@
                     <x-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                         {{ __('Dashboard') }}
                     </x-nav-link>
-                    @auth
-                        @if (Auth::user()->role === 'teacher' || Auth::user()->role === 'admin')
-                            <x-nav-link :href="route('teacher.assignments.index')" :active="request()->routeIs('teacher.assignments.*')">
-                                {{ __('Giao bài tập') }}
-                            </x-nav-link>
-                            <x-nav-link :href="route('teacher.grades.index')" :active="request()->routeIs('teacher.grades.*')">
-                                {{ __('Chấm bài') }}
-                            </x-nav-link>
-                        @endif
-                    @endauth
                 </div>
             </div>
 
@@ -80,16 +70,6 @@
             <x-responsive-nav-link :href="route('dashboard')" :active="request()->routeIs('dashboard')">
                 {{ __('Dashboard') }}
             </x-responsive-nav-link>
-            @auth
-                @if (Auth::user()->role === 'teacher' || Auth::user()->role === 'admin')
-                    <x-responsive-nav-link :href="route('teacher.assignments.index')" :active="request()->routeIs('teacher.assignments.*')">
-                        {{ __('Giao bài tập') }}
-                    </x-responsive-nav-link>
-                    <x-responsive-nav-link :href="route('teacher.grades.index')" :active="request()->routeIs('teacher.grades.*')">
-                        {{ __('Chấm bài') }}
-                    </x-responsive-nav-link>
-                @endif
-            @endauth
         </div>
 
         <!-- Responsive Settings Options -->

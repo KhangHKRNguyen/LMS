@@ -11,15 +11,16 @@ class ClassWorkspaceController extends Controller
     /**
      * Hiển thị thông tin chi tiết của một lớp học (Tổng quan)
      */
-    public function show($id)
+    public function show($class)
     {
-        // Eager load mối quan hệ 'course' và 'users' (chỉ lấy giảng viên/trợ lý, bỏ học viên qua một bên)
+        // Eager load mối quan hệ 'course' và 'users' 
         $class = CourseClass::with([
             'course', 
             'users' => function($query) {
-                $query->where('role', '!=', 'student'); // Lấy tất cả nhân sự không phải học viên
+                // SỬA: Lọc dựa trên cột database thực tế (role_id khác 4 để loại bỏ học viên)
+                $query->where('users.role_id', '!=', 4); 
             }
-        ])->findOrFail($id);
+        ])->findOrFail($class);
 
         return view('teacher.classes.info', compact('class'));
     }

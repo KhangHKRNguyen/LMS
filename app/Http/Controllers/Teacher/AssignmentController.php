@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Models\Assignment;
 use App\Models\CourseClass;
+use App\Models\AssignmentDistribution;
 use App\Services\ExcelImportService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -13,20 +14,19 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
 
+
 class AssignmentController extends Controller
 {
-    public function index(Request $request)
+    public function index($classId)
     {
-        // Lấy class_id từ URL (?class_id=1)
-        $classId = $request->query('class_id');
-
-        // Tìm lớp học cụ thể và nạp kèm bài tập, đếm sĩ số để nuôi Sidebar
+        // Tìm lớp học cụ thể dựa vào ID trên URL, nạp kèm bài tập và đếm sĩ số học viên
         $class = CourseClass::with(['assignments' => function($q) {
             $q->with('exam');
         }])
         ->withCount('students')
         ->findOrFail($classId);
 
+        // Trả về view quản lý bài tập
         return view('teacher.assignments.index', compact('class'));
     }
 
@@ -188,82 +188,6 @@ class AssignmentController extends Controller
             ->with('success', 'Đã cập nhật cấu hình đề thi trong Ngân hàng đề.');
     }
 
-    public function parseImport(Request $request, ExcelImportService $excelImportService)
-    {
-        try {
-            $request->validate([
-                'import_file' => ['required', 'file', 'max:5120'],
-            ]);
-            
-            $questions = $excelImportService->importQuestions($request->file('import_file'));
-            
-            return response()->json([
-                'success' => true,
-                'questions' => $questions,
-            ]);
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'success' => false,
-                'message' => $e->validator->errors()->first('import_file'),
-            ], 422);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Lỗi xử lý file hoặc cấu trúc Excel/CSV không đúng định dạng mẫu.',
-            ], 500);
-        }
-    }
-
-    public function export(Assignment $assignment)
-    {
-        $this->authorizeAssignment($assignment);
-        $questions = $assignment->questions()->get();
-        
-        $csvContent = "\xEF\xBB\xBF"; 
-        $csvContent .= "question_text,option_a,option_b,option_c,option_d,correct_option\n";
-        
-        foreach ($questions as $question) {
-            $text = str_replace('"', '""', $question->question_text);
-            $a = str_replace('"', '""', $question->option_a);
-            $b = str_replace('"', '""', $question->option_b);
-            $c = str_replace('"', '""', $question->option_c);
-            $d = str_replace('"', '""', $question->option_d);
-            $correct = $question->correct_option;
-            
-            $csvContent .= "\"{$text}\",\"{$a}\",\"{$b}\",\"{$c}\",\"{$d}\",\"{$correct}\"\n";
-        }
-        
-        $filename = "danh_sach_cau_hoi_" . Str::slug($assignment->title) . ".csv";
-        
-        return response($csvContent, 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
-        ]);
-    }
-
-    public function downloadAttachment(Assignment $assignment)
-    {
-        $this->authorizeAssignment($assignment);
-        
-        if (!$assignment->file_path || !Storage::disk('public')->exists($assignment->file_path)) {
-            return redirect()->back()->with('error', 'Không tìm thấy file đề bài đính kèm.');
-        }
-        
-        $pathInfo = pathinfo($assignment->file_path);
-        $extension = $pathInfo['extension'] ?? 'bin';
-        $filename = "de_bai_" . Str::slug($assignment->title) . "." . $extension;
-        
-        return Storage::disk('public')->download($assignment->file_path, $filename);
-    }
-
-    public function template(ExcelImportService $excelImportService)
-    {
-        return response($excelImportService->sampleCsvContent(), 200, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="mau_import_cau_hoi.csv"',
-        ]);
-    }
-
     private function teacherClasses()
     {
         return CourseClass::query()
@@ -296,5 +220,97 @@ class AssignmentController extends Controller
         $statusLabel = $assignment->is_visible ? 'hiển thị' : 'ẩn';
 
         return redirect()->back()->with('success', "Đã chuyển bài tập sang trạng thái: " . Str::ucfirst($statusLabel));
+    }
+
+    public function assignView($examId)
+    {
+        $exam = Assignment::findOrFail($examId);
+        
+        // SỬA TẠI ĐÂY: Thêm điều kiện lọc để chỉ lấy lớp học mà giảng viên đang đăng nhập phụ trách
+        $classes = CourseClass::whereHas('users', function($q) {
+                $q->where('users.id', Auth::id());
+            })
+            ->with(['lessonSessions' => function($q) {
+                $q->orderBy('lesson_date', 'asc');
+            }])
+            ->get();
+
+        // Lấy danh sách các lớp đã nhận đề thi này trước đó (Lọc thêm theo user_id để giảng viên chỉ thấy lịch sử giao của mình)
+        $distributions = AssignmentDistribution::with(['lessonSession.courseClass'])
+            ->where('assignment_id', $examId)
+            ->where('user_id', Auth::id()) // Thêm dòng này để bảo mật thông tin giữa các giáo viên
+            ->latest()
+            ->get();
+
+        return view('teacher.assignments.assign', compact('exam', 'classes', 'distributions'));
+    }
+    // 2. Xử lý lưu thông tin khi giáo viên bấm nút "Xác nhận giao bài"
+    public function assignStore(Request $request, $examId)
+    {
+        $exam = Assignment::findOrFail($examId);
+
+        // Bổ sung Ràng buộc Validate: Bắt buộc chọn buổi học và nhập thời gian làm bài
+        $request->validate([
+            'lesson_session_id' => ['required', 'exists:lesson_sessions,id'],
+            'duration_minutes'  => ['required', 'integer', 'min:1'],
+            'start_time'        => ['required', 'date'],
+            'due_time'          => ['required', 'date', 'after:start_time'],
+            'max_attempts'      => ['required', 'integer', 'min:1'],
+        ], [
+            'lesson_session_id.required' => 'Vui lòng chọn một buổi học cụ thể để giao bài (Bắt buộc).',
+            'lesson_session_id.exists'   => 'Buổi học được chọn không hợp lệ.',
+            'duration_minutes.required'  => 'Vui lòng nhập thời gian làm bài.',
+            'duration_minutes.integer'   => 'Thời gian làm bài phải là một số nguyên dương.',
+            'start_time.required'        => 'Vui lòng chọn thời gian bắt đầu mở bài.',
+            'due_time.required'          => 'Vui lòng chọn thời gian hạn nộp bài.',
+            'due_time.after'             => 'Thời gian hạn nộp phải diễn ra sau thời gian mở bài.',
+            'max_attempts.required'      => 'Vui lòng nhập số lần làm bài tối đa.',
+        ]);
+
+        // Tạo bản ghi phân phối bài thi vào bảng dữ liệu điều phối bài tập
+        AssignmentDistribution::create([
+            'assignment_id'    => $exam->id,
+            'user_id'          => Auth::id(),
+            'duration_minutes' => $request->input('duration_minutes'), // Nhận từ ô nhập liệu trên form
+            'open_time'        => $request->input('start_time'), 
+            'close_time'       => $request->input('due_time'),   
+            'max_attempts'     => $request->input('max_attempts'),
+            'status'           => 'active',
+            'lesson_session_id'=> $request->input('lesson_session_id'), // Nhận ID buổi học từ form chọn
+        ]);
+
+        return redirect()->route('teacher.exams.index')->with('success', 'Đã phân phối giao bài tập đến buổi học thành công!');
+    }
+
+    // 3. Hàm xóa/Hủy giao bài tập khỏi lớp học
+    public function destroy($id)
+    {
+        $distribution = AssignmentDistribution::findOrFail($id);
+        
+        // Kiểm tra quyền sở hữu (Chỉ người giao hoặc Admin mới được xóa)
+        if (Auth::user()->role !== 'admin' && $distribution->user_id !== Auth::id()) {
+            abort(403, 'Bạn không có quyền gỡ bài tập này.');
+        }
+
+        $distribution->delete();
+        return redirect()->back()->with('success', 'Đã hủy giao bài tập này thành công!');
+    }
+
+    public function globalIndex(Request $request)
+    {
+        // Lấy danh sách phối bài như cũ
+        $distributions = AssignmentDistribution::with(['assignment', 'lessonSession.courseClass'])
+            ->where('user_id', Auth::id())
+            ->latest()
+            ->get();
+
+        // BỔ SUNG: Tìm thông tin lớp nếu có class_id truyền lên từ sidebar
+        $class = null;
+        if ($request->has('class_id')) {
+            $class = \App\Models\CourseClass::find($request->query('class_id'));
+        }
+
+        // Truyền cả $distributions và $class sang view
+        return view('teacher.assignments.global_index', compact('distributions', 'class'));
     }
 }

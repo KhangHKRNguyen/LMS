@@ -8,7 +8,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use App\Rules\Recaptcha;
 
 class PasswordResetLinkController extends Controller
 {
@@ -28,24 +27,12 @@ class PasswordResetLinkController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $request->validate([
-                'email' => ['required', 'email'],
-                'captcha' => [
-                    'required',
-                    'string',
-                    function ($attribute, $value, $fail) {
-                        // Lấy mã captcha lưu trong Laravel Session ra so sánh
-                        $expected = session('captcha_code');
+            'email' => ['required', 'email'],
+        ]);
 
-                        if (!$expected || strcasecmp(trim($value), $expected) !== 0) {
-                            $fail('Mã bảo vệ hình ảnh không chính xác. Vui lòng thử lại.');
-                        }
-                    }
-                ],
-            ]);
-
-            // Nếu vượt qua validate thành công, xóa luôn mã session cũ để tránh dùng lại (Replay Attack)
-            session()->forget('captcha_code');
-
+        // We will send the password reset link to this user. Once we have attempted
+        // to send the link, we will examine the response then see the message we
+        // need to show to the user. Finally, we'll send out a proper response.
         $status = Password::sendResetLink(
             $request->only('email')
         );

@@ -7,9 +7,9 @@
     </div>
 
     <div class="mt-4">
-        <a href="{{ route('admin.dashboard') }}"
-            class="sidebar-menu-item {{ Request::routeIs('admin.dashboard') ? 'active' : '' }}">
-            QUẢN LÝ LỚP HỌC
+        <a href="{{ route('admin.courses.index') }}"
+            class="sidebar-menu-item {{ Request::routeIs('admin.courses.*') || Request::routeIs('admin.classes.*') ? 'active' : '' }}">
+            QUẢN LÝ KHÓA HỌC
         </a>
 
         <a href="{{ route('admin.accounts.index') }}"

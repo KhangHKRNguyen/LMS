@@ -28,9 +28,9 @@ class ClassMemberImportService
     public function sampleCsvContent(): string
     {
         return "\xEF\xBB\xBF".implode("\n", [
-            'id', // ĐÃ ĐỔI: user_code -> id
-            '"M002174"',
-            '"M008821"',
+            'id',
+            '"6"',
+            '"7"',
         ]);
     }
 
@@ -138,17 +138,17 @@ class ClassMemberImportService
                 ];
             } else {
                 $roleMapping = [
-                    'teacher' => 'Giảng viên',
-                    'student' => 'Học viên',
-                    'ta'      => 'Trợ lý lớp học',
-                    'admin'   => 'Quản trị viên'
+                    1 => 'Quản trị viên',
+                    2 => 'Giảng viên',
+                    3 => 'Trợ lý lớp học',
+                    4 => 'Học viên'
                 ];
 
                 $members[] = [
-                    'id'          => $user->id, // Thay thế cấu trúc cũ
+                    'id'          => $user->id,
                     'name'        => $user->name,
-                    'role_text'   => $roleMapping[$user->role] ?? $user->role,
-                    'status_text' => $user->status === 'active' ? 'Hợp lệ' : 'Tài khoản bị khóa',
+                    'role_text'   => $roleMapping[$user->role_id] ?? 'Không rõ', // Đổi từ $user->role sang $user->role_id
+                    'status_text' => $user->status === 'active' ? 'Hợp lệ' : 'Bị khóa',
                     'is_valid'    => $user->status === 'active'
                 ];
             }

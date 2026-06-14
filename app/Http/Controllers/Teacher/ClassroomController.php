@@ -9,66 +9,86 @@ use Illuminate\Support\Facades\Auth;
 
 class ClassroomController extends Controller
 {
-    /**
-     * Hiển thị danh sách học viên và ma trận chuyên cần của lớp học
-     */
     public function students($classId)
     {
         $teacher = Auth::user();
 
-        // 1. Kiểm tra quyền: Đảm bảo giáo viên này thực sự dạy lớp này
+        // 1. Lấy lớp học và nạp kèm các buổi học + danh sách bài tập đã giao của buổi đó
         $courseClass = CourseClass::whereHas('users', fn($q) => $q->where('user_id', $teacher->id))
-            ->with(['lessonSessions' => fn($q) => $q->orderBy('id', 'asc')]) // Lấy các buổi học theo thứ tự
+            ->with(['lessonSessions' => function($q) {
+                // Eager Load danh sách phân phối bài tập (assignmentDistributions) của buổi học
+                $q->orderBy('lesson_date', 'asc')->with('assignmentDistributions'); 
+            }])
             ->findOrFail($classId);
 
-        // 2. Lấy danh sách học viên của lớp (Phân trang 10 học viên/trang)
+        $class = $courseClass;
+
+        // 2. Lấy danh sách học viên trong lớp
         $students = $courseClass->students()->paginate(10);
 
-        // 3. Lấy toàn bộ lịch sử điểm danh của lớp để đối chiếu ma trận
-        // Nhóm theo user_id và lesson_session_id để dễ truy xuất
-        $attendanceMatrix = $courseClass->attendances()
-            ->get()
-            ->groupBy(['user_id', 'lesson_session_id']);
+        // Mốc thời gian hiện tại
+        $today = \Carbon\Carbon::today();
+        $now = \Carbon\Carbon::now();
 
-        // 4. Xử lý logic tính toán cho từng học viên
-        $students->getCollection()->transform(function ($student) use ($courseClass, $attendanceMatrix) {
+        // 3. Xử lý thuật toán ma trận trạng thái nộp bài dựa trên bảng phân phối
+        $students->getCollection()->transform(function ($student) use ($courseClass, $today, $now) {
             $totalMissing = 0;
             $sessionStatuses = [];
 
-            // Duyệt qua từng buổi học thực tế của lớp
             foreach ($courseClass->lessonSessions as $session) {
-                // Kiểm tra xem học viên có dữ liệu điểm danh cho buổi này không
-                $attendance = $attendanceMatrix[$student->id][$session->id] ?? null;
-                
-                // Giả định: nếu có bản ghi và trạng thái khác 'present' (hoặc tùy cấu trúc DB của bạn)
-                // Ở đây kiểm tra nếu không có điểm danh hoặc bản ghi đánh dấu là vắng/thiếu bài
-                if (!$attendance || (isset($attendance[0]) && $attendance[0]->status === 'absent')) {
-                    $status = 'Thiếu';
-                    $totalMissing++;
-                } else {
-                    $status = 'Đủ';
+                $sessionDate = \Carbon\Carbon::parse($session->lesson_date);
+
+                // QUY TẮC 1: Buổi học chưa đến ngày -> Không hiện trạng thái (Chưa học)
+                if ($sessionDate->isAfter($today)) {
+                    $status = 'Chưa đến';
+                } 
+                else {
+                    // Đã đến ngày học hoặc buổi học đã qua
+                    $distributions = $session->assignmentDistributions; // Các bài tập được giao cho buổi này
+
+                    // QUY TẮC 2: Buổi đó giáo viên không giao bài tập nào -> Tính là Đủ
+                    if ($distributions->isEmpty()) {
+                        $status = 'Đủ';
+                    } 
+                    else {
+                        // Buổi đó CÓ bài tập -> Kiểm tra xem có bài nào đã quá hạn đóng link (close_time) hay chưa
+                        $hasOverdueAssignment = false;
+
+                        foreach ($distributions as $dist) {
+                            // Vì close_time đã được cast là datetime trong Model nên nó là một đối tượng Carbon
+                            if ($dist->close_time && $dist->close_time->isPast()) {
+                                $hasOverdueAssignment = true;
+                                break;
+                            }
+                        }
+
+                        if ($hasOverdueAssignment) {
+                            // QUY TẮC 3: Có bài tập nhưng đã quá hạn nộp bài (close_time nằm trong quá khứ)
+                            // [HƯỚNG PHÁT TRIỂN KHI LÀM SUBMISSIONS]:
+                            // Sau này khi có bảng submissions, bạn check thêm: 
+                            // Nếu $student đã có bản ghi nộp bài khớp với $dist->id -> $status = 'Đủ'
+                            // Hiện tại chưa làm phần học viên nộp bài, mặc định quá hạn sẽ tính là 'Thiếu'
+                            $status = 'Thiếu';
+                            $totalMissing++;
+                        } else {
+                            // Có bài tập được giao nhưng chưa hết hạn nộp -> Vẫn hiển thị là Đủ (hoặc chờ học viên làm)
+                            $status = 'Đủ';
+                        }
+                    }
                 }
-                
+
+                // Ghi nhận trạng thái của buổi học
                 $sessionStatuses[$session->id] = $status;
             }
 
-            // Tính toán mức độ cảnh báo dựa trên tổng số buổi thiếu bài/vắng
-            $alarm = '—';
-            if ($totalMissing >= 7) {
-                $alarm = 'Mức 2';
-            } elseif ($totalMissing >= 3) {
-                $alarm = 'Mức 1';
-            }
-
-            // Đính kèm các thuộc tính tính toán động vào đối tượng student
+            // Đóng gói thông tin ngược lại vào model student
             $student->session_statuses = $sessionStatuses;
             $student->total_missing = $totalMissing;
-            $student->alarm_level = $alarm;
+            $student->alarm_level = ($totalMissing >= 9) ? 'Mức 2' : (($totalMissing >= 7) ? 'Mức 1' : '—');
 
             return $student;
         });
 
-        // 5. Trả dữ liệu ra ngoài View
-        return view('teacher.students.index', compact('courseClass', 'students'));
+        return view('teacher.students.index', compact('class', 'students'));
     }
 }

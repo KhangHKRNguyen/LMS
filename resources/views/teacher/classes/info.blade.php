@@ -20,7 +20,7 @@
             <div class="col-md-3">
                 <label class="form-label style-label">Trạng thái</label>
                 <div class="form-control style-input">
-                    {{ $class->status === 'active' ? 'Đang hoạt động' : 'Kết thúc' }}
+                    {{ $class->status === 'Đang mở' ? 'Đang hoạt động' : 'Kết thúc' }}
                 </div>
             </div>
         </div>
@@ -29,7 +29,7 @@
         <table class="table table-bordered text-center align-middle mt-2">
             <thead style="background-color: #7A0C0C; color: white;">
                 <tr>
-                    <th>#</th>
+                    <th>STT</th>
                     <th>Mã nhân sự</th>
                     <th>Họ tên</th>
                     <th>Chức vụ</th>
@@ -39,12 +39,12 @@
                 @forelse($class->users as $index => $staff)
                 <tr>
                     <td>{{ $index + 1 }}</td>
-                    <td>{{ $staff->employee_code ?? 'M00' . $staff->id }}</td>
+                    <td>{{ $staff->id }}</td>
                     <td>{{ $staff->name }}</td>
                     <td>
                         @if($staff->role === 'teacher')
                             Giảng viên
-                        @elseif($staff->role === 'assistant')
+                        @elseif($staff->role === 'ta')
                             Trợ lý lớp học
                         @else
                             Nhân sự quản lý

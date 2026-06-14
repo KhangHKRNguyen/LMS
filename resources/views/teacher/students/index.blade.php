@@ -9,67 +9,87 @@
 @section('classroom_content')
 <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-        <h5 class="fw-bold m-0"><a href="#" class="text-decoration-none text-dark"><i class="bi bi-arrow-left me-2"></i>LỚP HỌC - U206</a></h5>
-        <small class="text-muted fw-bold">Tổng số học viên: 20</small>
+        <h5 class="fw-bold m-0">
+            {{-- 1. ĐƯỜNG DẪN QUAY LẠI DASHBOARD --}}
+            <a href="{{ route('teacher.dashboard') }}" class="text-decoration-none text-dark">
+                <i class="bi bi-arrow-left me-2"></i>LỚP HỌC - {{ $class->class_name }} {{-- 2. TÊN LỚP ĐỘNG --}}
+            </a>
+        </h5>
+        {{-- 3. ĐẾM TỔNG SỐ HỌC VIÊN THỰC TẾ QUA PHÂN TRANG --}}
+        <small class="text-muted fw-bold">Tổng số học viên: {{ $students->total() }}</small>
     </div>
+    
     <div class="d-flex align-items-center gap-3">
-        <select class="form-select form-select-sm border-danger fw-semibold text-dark" style="width: 130px;">
-            <option>Buổi học</option>
+        {{-- 4. HIỂN THỊ DANH SÁCH CÁC BUỔI HỌC TỪ DATABASE --}}
+        <select class="form-select form-select-sm border-danger fw-semibold text-dark" style="width: 160px;">
+            <option value="">-- Chọn buổi học --</option>
+            @foreach($class->lessonSessions as $index => $session)
+                <option value="{{ $session->id }}">
+                    Buổi {{ $index + 1 }} ({{ date('d/m/Y', strtotime($session->lesson_date)) }})
+                </option>
+            @endforeach
         </select>
-        <i class="bi bi-bell-fill fs-5 text-warning" style="cursor:pointer;"></i>
-        <div class="rounded-circle bg-secondary" style="width: 35px; height: 35px; background: url('https://via.placeholder.com/35') no-repeat center/cover;"></div>
     </div>
 </div>
 
 {{-- MA TRẬN THEO DÕI CHUYÊN CẦN --}}
-<div class="table-responsive shadow-sm border rounded">
-    <table class="table table-hover align-middle text-center m-0">
-        <thead style="background-color: #800000; color: white;">
+<div class="table-responsive shadow-sm rounded border">
+    <table class="table table-bordered align-middle text-center m-0">
+        <thead style="background-color: #800000; color: white; font-size: 13px;">
             <tr>
-                <th style="width: 50px;">#</th>
-                <th>Mã HV</th>
-                <th class="text-start">Họ tên</th>
-                <th>Buổi 1</th>
-                <th>Buổi 2</th>
-                <th>Buổi 3</th>
-                <th>.....</th>
+                <th style="width: 50px; padding: 12px;">STT</th>
+                <th style="width: 90px;">Mã số HV</th>
+                <th class="text-start ps-4">Họ và tên</th>
+                
+                {{-- LẶP ĐỘNG TIÊU ĐỀ CÁC BUỔI HỌC CÓ TRONG DATABASE --}}
+                @foreach($class->lessonSessions as $index => $session)
+                    <th>Buổi {{ $index + 1 }}</th>
+                @endforeach
+                
                 <th>Tổng thiếu bài</th>
                 <th>Cảnh báo</th>
             </tr>
         </thead>
-        <tbody>
-            @php
-                $mockMatrix = [
-                    ['id' => '101424', 'name' => 'Nguyễn Văn A', 'b1' => 'Đủ', 'b2' => 'Thiếu', 'b3' => 'Thiếu', 'total' => 7, 'alarm' => 'Mức 1'],
-                    ['id' => '101424', 'name' => 'Nguyễn Văn A', 'b1' => 'Đủ', 'b2' => 'Thiếu', 'b3' => 'Thiếu', 'total' => 7, 'alarm' => 'Mức 1'],
-                    ['id' => '101424', 'name' => 'Nguyễn Văn A', 'b1' => 'Đủ', 'b2' => 'Thiếu', 'b3' => 'Thiếu', 'total' => 9, 'alarm' => 'Mức 2'],
-                    ['id' => '101424', 'name' => 'Nguyễn Văn A', 'b1' => 'Đủ', 'b2' => 'Thiếu', 'b3' => 'Thiếu', 'total' => 1, 'alarm' => '—'],
-                    ['id' => '101424', 'name' => 'Nguyễn Văn A', 'b1' => 'Đủ', 'b2' => 'Đủ', 'b3' => 'Đủ', 'total' => 2, 'alarm' => '—'],
-                ];
-            @endphp
-            @foreach($mockMatrix as $index => $row)
+        <tbody style="font-size: 14px;">
+            @foreach ($students as $index => $student)
             <tr>
-                <td>{{ $index + 1 }}</td>
-                <td class="text-secondary fw-medium">{{ $row['id'] }}</td>
-                <td class="text-start fw-semibold">{{ $row['name'] }}</td>
-                <td><span class="badge px-3 py-1 text-dark bg-success-subtle border border-success" style="background-color:#CCFFCC !important;">Đủ</span></td>
-                <td><span class="badge px-3 py-1 text-dark bg-danger-subtle border border-danger" style="background-color:#FFCCCC !important;">{{ $row['b2'] }}</span></td>
-                <td><span class="badge px-3 py-1 text-dark bg-danger-subtle border border-danger" style="background-color:#FFCCCC !important;">{{ $row['b3'] }}</span></td>
-                <td class="text-muted">...</td>
-                <td class="fw-bold">{{ $row['total'] }}</td>
-                <td class="fw-bold {{ $row['alarm'] !== '—' ? 'text-danger' : 'text-muted' }}">{{ $row['alarm'] }}</td>
+                {{-- Số thứ tự tự tăng theo trang --}}
+                <td>{{ ($students->currentPage() - 1) * $students->perPage() + $index + 1 }}</td>
+                <td class="text-secondary fw-medium">{{ $student->id }}</td>
+                <td class="text-start ps-4 fw-semibold text-dark">{{ $student->name }}</td>
+                
+                @foreach($class->lessonSessions as $session)
+                    @php
+                        $status = $student->session_statuses[$session->id] ?? 'Chưa đến';
+                    @endphp
+                    <td class="text-center align-middle">
+                        @if($status === 'Thiếu')
+                            <span class="badge px-3 py-1 text-danger bg-danger-subtle border border-danger" style="background-color:#FFCCCC !important; color: #990000 !important;">
+                                Thiếu
+                            </span>
+                        @elseif($status === 'Đủ')
+                            <span class="badge px-3 py-1 text-success bg-success-subtle border border-success" style="background-color:#CCFFCC !important; color: #006600 !important;">
+                                Đủ
+                            </span>
+                        @else
+                            <span class="text-muted fw-bold">—</span>
+                        @endif
+                    </td>
+                @endforeach
+                
+                {{-- Hiển thị dữ liệu tính toán từ Controller --}}
+                <td class="fw-bold text-dark">{{ $student->total_missing }}</td>
+                <td class="fw-bold {{ $student->alarm_level !== '—' ? 'text-danger' : 'text-muted' }}">
+                    {{ $student->alarm_level }}
+                </td>
             </tr>
             @endforeach
         </tbody>
     </table>
 </div>
 
-{{-- PAGINATION --}}
-<div class="d-flex justify-content-center mt-4 gap-1">
-    <button class="btn btn-sm btn-secondary px-3 py-1" disabled>Trước</button>
-    <button class="btn btn-sm text-white px-3 py-1" style="background-color:#800000;">1</button>
-    <button class="btn btn-sm btn-light border px-3 py-1">2</button>
-    <button class="btn btn-sm btn-light border px-3 py-1">3</button>
-    <button class="btn btn-sm btn-secondary px-3 py-1">Tiếp theo</button>
+{{-- PHÂN TRANG TỰ ĐỘNG CỦA LARAVEL --}}
+<div class="d-flex justify-content-center mt-4">
+    {{ $students->links() }}
 </div>
 @endsection

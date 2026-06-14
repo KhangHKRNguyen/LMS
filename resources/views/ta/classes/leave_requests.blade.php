@@ -1,4 +1,4 @@
-@extends('layouts.app')
+@extends('layouts.lms')
 
 @section('title', 'Quản lý đơn xin nghỉ học - TA')
 
@@ -8,13 +8,6 @@
         <i class="bi bi-arrow-left"></i> Quay lại bảng điều khiển
     </a>
 </div>
-
-@if(session('success'))
-    <div class="alert alert-success alert-dismissible fade show" role="alert">
-        <i class="bi bi-check-circle-fill"></i> {{ session('success') }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
-@endif
 
 <div class="card shadow-sm border-0 mb-4" style="border-radius: 8px;">
     <div class="card-body p-4 bg-white" style="border-top: 4px solid #DF8A14; border-radius: 8px;">

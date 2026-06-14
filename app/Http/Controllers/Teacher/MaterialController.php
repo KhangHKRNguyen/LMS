@@ -11,97 +11,108 @@ use Illuminate\Support\Facades\Storage;
 
 class MaterialController extends Controller
 {
-    public function index(Request $request)
+    // Thêm tham số $classId vào signature của hàm (mặc định bằng null để tránh lỗi)
+    public function index(Request $request, $classId = null)
     {
         $teacher = Auth::user();
         $classes = $teacher->classes;
 
-        $selectedClass = null;
+        $class = null;
         $materials     = collect();
         $search        = $request->get('search', '');
         $filterType    = $request->get('type', '');
         $stats         = [];
 
-        if ($request->filled('class_id')) {
-            $selectedClass = CourseClass::where('id', $request->class_id)
+        // ĐỒNG BỘ TẠI ĐÂY: Ưu tiên lấy classId từ URL Route, nếu không có mới tìm trong Request query
+        $classId = $classId ?? $request->get('class_id');
+
+        if ($classId) {
+            $class = CourseClass::where('id', $classId)
                 ->whereHas('users', fn($q) => $q->where('user_id', $teacher->id))
                 ->firstOrFail();
 
-            // Thống kê số lượng theo định dạng file
-            $allMaterials = $selectedClass->materials()->get();
+            // 1. Thống kê tổng số lượng file trước khi lọc danh sách chính
+            $allMaterials = $class->materials()->get();
             $stats = [
                 'total' => $allMaterials->count(),
                 'pdf'   => $allMaterials->filter(fn($m) => strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)) === 'pdf')->count(),
                 'word'  => $allMaterials->filter(fn($m) => in_array(strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)), ['doc', 'docx']))->count(),
                 'ppt'   => $allMaterials->filter(fn($m) => in_array(strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)), ['ppt', 'pptx']))->count(),
-                'excel' => $allMaterials->filter(fn($m) => in_array(strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)), ['xls', 'xlsx']))->count(),
             ];
 
-            $query = $selectedClass->materials()->latest();
+            // 2. Tạo query lấy danh sách tài liệu và áp dụng bộ lọc tìm kiếm
+            $materialsQuery = $class->materials();
 
-            // Tìm kiếm theo tiêu đề
-            if ($search) {
-                $query->where('title', 'like', '%' . $search . '%');
+            // Lọc theo từ khóa tìm kiếm (title)
+            if (!empty($search)) {
+                $materialsQuery->where('title', 'LIKE', '%' . $search . '%');
             }
 
-            // Lọc theo định dạng file
-            if ($filterType) {
-                $typeMap = [
-                    'pdf'   => ['pdf'],
-                    'word'  => ['doc', 'docx'],
-                    'ppt'   => ['ppt', 'pptx'],
-                    'excel' => ['xls', 'xlsx'],
-                ];
-                if (isset($typeMap[$filterType])) {
-                    $exts = $typeMap[$filterType];
-                    $query->where(function ($q) use ($exts) {
-                        foreach ($exts as $ext) {
-                            $q->orWhere('file_path', 'like', '%.' . $ext);
-                        }
-                    });
+            // Lọc theo định dạng file (loại tài liệu)
+            if (!empty($filterType)) {
+                if ($filterType === 'word') {
+                    $materialsQuery->where(fn($q) => $q->where('file_path', 'LIKE', '%.doc')->orWhere('file_path', 'LIKE', '%.docx'));
+                } elseif ($filterType === 'ppt') {
+                    $materialsQuery->where(fn($q) => $q->where('file_path', 'LIKE', '%.ppt')->orWhere('file_path', 'LIKE', '%.pptx'));
+                } else {
+                    $materialsQuery->where('file_path', 'LIKE', '%.' . $filterType);
                 }
             }
 
-            $materials = $query->paginate(10)->withQueryString();
+            $materials = $materialsQuery->get();
         }
 
         return view('teacher.materials.index', compact(
-            'classes', 'selectedClass', 'materials',
-            'search', 'filterType', 'stats'
+            'classes', 
+            'class', 
+            'materials', 
+            'stats', 
+            'search', 
+            'filterType'
         ));
     }
 
     public function store(Request $request)
     {
-        $request->validate([
-            'class_id' => 'required|exists:course_classes,id',
-            'title'    => 'required|string|max:255',
-            'file'     => 'required|file|mimes:pdf,doc,docx,ppt,pptx,xls,xlsx|max:20480',
-        ], [
-            'title.required' => 'Vui lòng nhập tiêu đề tài liệu.',
-            'title.max'      => 'Tiêu đề không được vượt quá 255 ký tự.',
-            'file.required'  => 'Vui lòng chọn file tài liệu.',
-            'file.mimes'     => 'Chỉ chấp nhận file PDF, Word, PowerPoint hoặc Excel.',
-            'file.max'       => 'File không được vượt quá 20MB.',
-        ]);
-
         $teacher = Auth::user();
 
-        $class = CourseClass::whereHas('users', fn($q) => $q->where('user_id', $teacher->id))
-            ->findOrFail($request->class_id);
-
-        $path = $request->file('file')->store('uploads/materials', 'public');
-
-        Material::create([
-            'title'           => $request->title,
-            'file_path'       => $path,
-            'course_class_id' => $class->id,
+        // 1. Validate dữ liệu đầu vào
+        $request->validate([
+            'class_id'  => 'required|exists:course_classes,id',
+            'title'     => 'required|string|max:255',
+            'file'      => 'required|file|mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,zip,rar|max:20480', // tối đa 20MB
+        ], [
+            'title.required' => 'Vui lòng nhập tiêu đề tài liệu.',
+            'file.required'  => 'Vui lòng chọn file tài liệu để tải lên.',
+            'file.mimes'     => 'Định dạng file không hợp lệ (Chỉ chấp nhận PDF, Word, Excel, PowerPoint, ZIP, RAR).',
+            'file.max'       => 'Dung lượng file không được vượt quá 20MB.',
         ]);
 
+        // 2. Kiểm tra quyền sở hữu lớp học của giảng viên
+        $class = CourseClass::whereHas('users', fn($q) => $q->where('user_id', $teacher->id))
+            ->findOrFail($request->get('class_id'));
+
+        // 3. Xử lý lưu trữ file vào thư mục public
+        $filePath = null;
+        if ($request->hasFile('file')) {
+            $file     = $request->file('file');
+            $filePath = $file->store('uploads/materials', 'public');
+        }
+
+        // 4. Tạo bản ghi tài liệu mới vào Database
+        Material::create([
+            'title'           => $request->get('title'),
+            'file_path'       => $filePath,
+            'course_class_id' => $class->id,
+            'user_id'         => $teacher->id, 
+            'file_type'       => $request->file('file')->getClientOriginalExtension(),
+        ]);
+
+        // 5. Quay lại kèm thông báo thành công
         return redirect()->route('teacher.materials.index', [
-            'class_id' => $class->id,
-            'search'   => $request->get('search', ''),
-            'type'     => $request->get('type', ''),
+            'class'  => $class->id,
+            'search' => $request->get('search', ''),
+            'type'   => $request->get('type', ''),
         ])->with('success', 'Tài liệu đã được tải lên thành công!');
     }
 
@@ -134,7 +145,7 @@ class MaterialController extends Controller
         $material->delete();
 
         return redirect()->route('teacher.materials.index', [
-            'class_id' => $class->id,
+            'class' => $class->id,
             'search'   => request('search', ''),
             'type'     => request('type', ''),
         ])->with('success', 'Tài liệu đã được xóa!');

@@ -24,27 +24,28 @@ class ClassController extends Controller
      * TÍNH NĂNG 1: QUẢN LÝ THÔNG TIN LỚP HỌC (CRUD)
      */
 
-    // GET /admin/classes - Danh sách lớp học (Có tìm kiếm & phân trang)
+    // GET /admin/classes - Danh sách lớp học
     public function index(Request $request)
     {
-        // Loại bỏ hoàn toàn khoảng trắng thừa ở hai đầu đầu chuỗi tìm kiếm
         $search = trim($request->input('search', ''));
+        $courseId = $request->input('course_id');
 
-        $classes = CourseClass::with('course')
-            ->withCount(['users', 'assignments']) 
-            ->when($search, function ($query) use ($search) {
-                // Gom tất cả điều kiện OR vào trong một nhóm WHERE duy nhất bằng Closure
-                return $query->where(function ($subQuery) use ($search) {
-                    $subQuery->where('class_name', 'like', "%{$search}%")
-                            ->orWhere('room', 'like', "%{$search}%")
-                            ->orWhereHas('course', function ($q) use ($search) {
-                                $q->where('name', 'like', "%{$search}%");
-                            });
-                });
+        // Bắt buộc Eager Load 'course' và 'teacher' để tránh N+1 Query và chống lỗi rỗng
+        $classes = CourseClass::with(['course', 'teacher'])
+            ->withCount([
+                'students' // Tự động đếm số lượng học viên -> sinh ra biến students_count
+            ])
+            ->when($courseId, function ($query) use ($courseId) {
+                return $query->where('course_id', $courseId);
             })
-            ->latest()
-            ->paginate(10);
-        return view('admin.classes.index', compact('classes'));
+            ->when($search, function ($query) use ($search) {
+                return $query->where('class_name', 'LIKE', "%{$search}%");
+            })
+            ->orderBy('id', 'desc')
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('admin.classes.index', compact('classes', 'search'));
     }
 
     // GET /admin/classes/create - Giao diện tạo lớp học mới
@@ -54,21 +55,84 @@ class ClassController extends Controller
         return view('admin.classes.create', compact('courses'));
     }
 
-    // POST /admin/classes - Lưu thông tin lớp học mới
+    // POST /admin/classes - Lưu thông tin lớp học & tự động tính ngày kết thúc (Thời lượng chia 2)
     public function store(Request $request)
     {
+        // 1. Kiểm tra dữ liệu đầu vào
         $validated = $request->validate([
-            'class_name' => 'required|string|max:255',
-            'course_id'  => 'required|exists:courses,id',
-            'room'       => 'nullable|string|max:255',
-            'start_time' => 'required|date',
-            'end_time'   => 'required|date|after_or_equal:start_time',
-            'status'     => 'required|string|in:Đang mở,Đã đóng',
+            'class_name'     => 'required|string|max:255',
+            'start_time'     => 'required|date|after_or_equal:today',
+            'room'           => 'nullable|string|max:255',
+            'course_id'      => 'required|exists:courses,id',
+            'status'         => 'required|string',
+            'days_of_week'   => 'required|array|min:1', 
+            'days_of_week.*' => 'integer|between:1,6',   
+        ], [
+            'class_name.required'   => 'Tên lớp học không được bỏ trống.',
+            'start_time.required'   => 'Ngày bắt đầu không được bỏ trống.',
+            'start_time.after_or_equal' => 'Ngày bắt đầu không được là một ngày trong quá khứ.',
+            'days_of_week.required' => 'Vui lòng chọn ít nhất một ngày học định kỳ trong tuần.',
         ]);
 
-        CourseClass::create($validated);
+        // 2. Lấy thông tin khóa học để tính số buổi học dựa trên số giờ
+        $course = Course::findOrFail($validated['course_id']);
+        
+        $totalHours = intval($course->duration); // Bóc tách số giờ (VD: "60 giờ" -> 60)
+        
+        // CÔNG THỨC: Số buổi = Tổng số giờ / 2 (Mỗi buổi học kéo dài 2 giờ)
+        // Dùng ceil() để làm tròn lên nếu tổng số giờ bị lẻ (VD: 45 giờ / 2 = 22.5 -> 23 buổi)
+        $totalSessions = ceil($totalHours / 2); 
 
-        return redirect()->route('admin.classes.index')->with('success', 'Tạo lớp học mới thành công!');
+        if ($totalSessions <= 0) {
+            return back()->with('error', 'Khóa học này chưa có tổng số giờ (duration) hợp lệ để tự động tính số buổi học.')->withInput();
+        }
+
+        DB::beginTransaction();
+
+        try {
+            // 3. Thuật toán tự động sinh chuỗi ngày học dựa trên lịch chọn tuần
+            $selectedDays = $validated['days_of_week']; 
+            $currentDate = \Carbon\Carbon::parse($validated['start_time']);
+            $sessionDates = [];
+
+            // Chạy vòng lặp tìm ngày khớp lịch cho đến khi gom đủ số lượng buổi học đã chia 2
+            while (count($sessionDates) < $totalSessions) {
+                // dayOfWeekIso: 1 (Thứ 2) -> 7 (Chủ nhật)
+                if (in_array($currentDate->dayOfWeekIso, $selectedDays)) {
+                    $sessionDates[] = $currentDate->format('Y-m-d');
+                }
+                $currentDate->addDay();
+            }
+
+            // Ngày học cuối cùng trong mảng chính là ngày kết thúc lớp học
+            $calculatedEndDate = end($sessionDates);
+
+            // 4. Tạo mới lớp học với ngày kết thúc tự động tính toán được
+            $class = CourseClass::create([
+                'class_name' => $validated['class_name'],
+                'start_date' => $validated['start_time'],
+                'end_date'   => $calculatedEndDate, 
+                'room'       => $validated['room'] ?? null,
+                'course_id'  => $validated['course_id'],
+                'status'     => $validated['status'],
+            ]);
+
+            // 5. Thêm hàng loạt các buổi học tương ứng vào bảng lesson_sessions
+            foreach ($sessionDates as $date) {
+                $class->lessonSessions()->create([
+                    'lesson_date' => $date,
+                ]);
+            }
+
+            DB::commit();
+
+            return redirect()->route('admin.classes.index')
+                ->with('success', "Tạo lớp học thành công! Khóa học gồm {$totalHours} giờ đã được tự động quy đổi thành {$totalSessions} buổi học. Ngày kết thúc dự kiến: " . \Carbon\Carbon::parse($calculatedEndDate)->format('d/m/Y'));
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', 'Hệ thống gặp sự cố khi xử lý lịch học: ' . $e->getMessage())->withInput();
+        }
     }
 
     // GET /admin/classes/{id}/edit - Giao diện chỉnh sửa lớp học
@@ -81,20 +145,23 @@ class ClassController extends Controller
     }
 
     // PUT /admin/classes/{id} - Cập nhật thông tin lớp học
-    public function update(Request $request, $id)
+    public function update(Request $request, CourseClass $class)
     {
-        $class = CourseClass::findOrFail($id);
-
+        // Chỉ validate những trường được phép sửa đổi công khai
         $validated = $request->validate([
             'class_name' => 'required|string|max:255',
-            'course_id'  => 'required|exists:courses,id',
             'room'       => 'nullable|string|max:255',
-            'start_time' => 'required|date',
-            'end_time'   => 'required|date|after_or_equal:start_time',
-            'status'     => 'required|string|in:Đang mở,Đã đóng',
+            'status'     => 'required|string',
+        ], [
+            'class_name.required' => 'Tên lớp học không được bỏ trống.',
         ]);
 
-        $class->update($validated);
+        // Tiến hành cập nhật, tuyệt đối không truyền start_date, end_date hay course_id vào đây
+        $class->update([
+            'class_name' => $validated['class_name'],
+            'room'       => $validated['room'] ?? null,
+            'status'     => $validated['status'],
+        ]);
 
         return redirect()->route('admin.classes.index')->with('success', 'Cập nhật thông tin lớp học thành công!');
     }
@@ -122,9 +189,20 @@ class ClassController extends Controller
     public function members(Request $request, $id)
     {
         $class = CourseClass::findOrFail($id);
+        $search = trim($request->input('search', ''));
         
-        // Lấy danh sách thành viên hiện tại của lớp học
-        $currentMembers = $class->users()->get(); 
+        // Lọc thành viên theo search term
+        $members = $class->users()
+            ->with('roleRelation')
+            ->when($search, function ($query) use ($search) {
+                return $query->where(function ($q) use ($search) {
+                    $q->where('users.id', 'LIKE', "%{$search}%")
+                    ->orWhere('users.name', 'LIKE', "%{$search}%")
+                    ->orWhere('users.email', 'LIKE', "%{$search}%");
+                });
+            })
+            ->get();
+        
         $previewMembers = null;
 
         // Nếu admin thực hiện upload file để xem trước (Preview)
@@ -134,41 +212,55 @@ class ClassController extends Controller
             ]);
 
             try {
-                // Gọi service xử lý phân tích dữ liệu file import
                 $previewMembers = $this->importService->importMembers($request->file('import_file'));
             } catch (\Exception $e) {
                 return back()->with('error', 'Lỗi phân tích file: ' . $e->getMessage());
             }
         }
 
-        return view('admin.classes.members', compact('class', 'currentMembers', 'previewMembers'));
+        return view('admin.classes.members', compact('class', 'members', 'search', 'previewMembers'));
     }
 
     // POST /admin/classes/{id}/members/add-single - Thêm thủ công lẻ 1 thành viên theo Mã số (id)
-    public function addMember(Request $request, $id)
+    public function addSingleMember(Request $request, CourseClass $class)
     {
-        $class = CourseClass::findOrFail($id);
+        // Lấy giá trị định danh từ form (hỗ trợ linh hoạt các thuộc tính name có thể đặt ở View)
+        $identifier = trim($request->input('member_code') ?? $request->input('user_id') ?? $request->input('email') ?? $request->input('single_member_code') ?? '');
 
-        $request->validate([
-            'user_code' => 'required|string', // Mã sinh viên/giảng viên nhập từ form lẻ
-        ]);
+        // Thuật toán dự phòng: Quét lấy tham số đầu tiên khác token nếu view đặt name lạ
+        if (empty($identifier)) {
+            foreach ($request->all() as $key => $value) {
+                if ($key !== '_token' && !empty($value) && is_string($value)) {
+                    $identifier = trim($value);
+                    break;
+                }
+            }
+        }
 
-        $userCode = $request->input('user_code');
-        $user = User::find($userCode);
+        if (empty($identifier)) {
+            return back()->with('error', 'Vui lòng nhập thông tin thành viên muốn thêm!');
+        }
+
+        // Tìm kiếm tài khoản thông minh qua 3 trường định danh phổ biến
+        $user = User::where('id', $identifier)
+                    ->orWhere('email', $identifier)
+                    ->orWhere('phone', $identifier)
+                    ->first();
 
         if (!$user) {
-            return back()->with('error', "Không tìm thấy tài khoản nào có mã định danh: {$userCode}");
+            return back()->with('error', "Không tìm thấy thành viên nào khớp với thông tin: \"{$identifier}\"");
         }
 
-        // Kiểm tra xem tài khoản này đã được gán vào lớp này từ trước chưa
+        // Kiểm tra xem thành viên này đã có sẵn trong lớp học chưa
         if ($class->users()->where('user_id', $user->id)->exists()) {
-            return back()->with('error', 'Thành viên này hiện đã có mặt trong lớp học!');
+            return back()->with('error', "Thành viên \"{$user->name}\" đã tham gia lớp học này từ trước!");
         }
 
-        // Đính kèm user vào bảng trung gian (class_user)
+        // Đính kèm bản ghi vào bảng trung gian class_user
         $class->users()->attach($user->id);
 
-        return back()->with('success', "Đã thêm thành công thành viên: {$user->name} vào lớp.");
+        return redirect()->route('admin.classes.members', $class->id)
+            ->with('success', "Đã thêm thành viên \"{$user->name}\" vào lớp học thành công!");
     }
 
     // DELETE /admin/classes/{class_id}/members/{user_id} - Xóa thành viên khỏi lớp
@@ -179,7 +271,7 @@ class ClassController extends Controller
         // Gỡ bỏ liên kết trong bảng trung gian
         $class->users()->detach($userId);
 
-        return back()->with('success', 'Đã xóa thành viên khỏi lớp học thành open.');
+        return back()->with('success', 'Đã xóa thành viên khỏi lớp học thành công!');
     }
 
     // POST /admin/classes/{id}/members/store-bulk - Lưu hàng loạt thành viên từ dữ liệu file preview vào DB
@@ -222,5 +314,55 @@ class ClassController extends Controller
             DB::rollBack();
             return back()->with('error', 'Hệ thống gặp lỗi khi lưu dữ liệu hàng loạt: ' . $e->getMessage());
         }
+    }
+
+    public function previewMembers(Request $request, CourseClass $class)
+    {
+        // Kiểm tra xem request có chứa file nạp không, ví dụ tên file input là 'import_file'
+        if (!$request->hasFile('import_file')) {
+            return back()->with('error', 'Vui lòng chọn file dữ liệu!');
+        }
+
+        // Gọi đúng tên hàm importMembers và truyền file vào
+        $previewMembers = $this->importService->importMembers($request->file('import_file')); 
+
+        return view('admin.classes.members', compact('class', 'previewMembers'));
+    }
+
+    public function downloadSample()
+    {
+        // Lấy nội dung file CSV mẫu đã được viết sẵn trong Service của bạn
+        $content = $this->importService->sampleCsvContent();
+
+        // Trả về file cho trình duyệt tự động tải xuống
+        return response($content)
+            ->header('Content-Type', 'text/csv; charset=UTF-8')
+            ->header('Content-Disposition', 'attachment; filename="mau_nap_thanh_vien.csv"');
+    }
+
+    public function searchUsers(Request $request, CourseClass $class)
+    {
+        $search = trim($request->input('q', ''));
+
+        // Nếu người dùng gõ ít hơn 2 ký tự thì không cần tìm kiếm để đỡ tốn tài nguyên
+        if (strlen($search) < 2) {
+            return response()->json([]);
+        }
+
+        // Lấy danh sách ID của những người ĐÃ Ở TRONG LỚP để loại trừ
+        $excludedUserIds = $class->users()->pluck('users.id')->toArray();
+
+        // Tìm kiếm trong bảng users
+        $users = User::whereNotIn('id', $excludedUserIds)
+            ->where(function ($query) use ($search) {
+                $query->where('id', 'LIKE', "%{$search}%")
+                    ->orWhere('name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%");
+            })
+            ->limit(8) // Chỉ lấy tối đa 8 kết quả để hiển thị đẹp gọn
+            ->get(['id', 'name', 'email']);
+
+        // Trả về định dạng JSON cho Javascript xử lý công khai
+        return response()->json($users);
     }
 }

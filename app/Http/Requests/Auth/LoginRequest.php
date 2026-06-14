@@ -9,7 +9,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
-use App\Rules\Recaptcha; // Đã giữ nguyên import Rule kiểm tra captcha của bạn
 
 class LoginRequest extends FormRequest
 {
@@ -27,31 +26,12 @@ class LoginRequest extends FormRequest
      * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
-        {
-            $rules = [
-                'email' => ['required', 'string', 'email'],
-                'password' => ['required', 'string'],
-            ];
-
-            // Nếu người dùng nhập sai từ 2 lần trở lên, bắt kiểm tra Captcha hình ảnh
-            if (session('login_attempts', 0) >= 2) {
-                $rules['captcha'] = [
-                    'required',
-                    'string',
-                    function ($attribute, $value, $fail) {
-                        // Lấy mã lưu trong Laravel Session ở bước 1 ra
-                        $expected = session('captcha_code');
-
-                        // So sánh không phân biệt chữ hoa chữ thường giống như hàm strcasecmp
-                        if (!$expected || strcasecmp(trim($value), $expected) !== 0) {
-                            $fail('Mã bảo vệ hình ảnh không chính xác. Vui lòng thử lại.');
-                        }
-                    }
-                ];
-            }
-
-            return $rules;
-        }
+    {
+        return [
+            'email' => ['required', 'string', 'email'],
+            'password' => ['required', 'string'],
+        ];
+    }
 
     /**
      * Attempt to authenticate the request's credentials.
@@ -65,19 +45,12 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
-            session(['login_attempts' => session('login_attempts', 0) + 1]);
-            
-            // Xóa mã captcha cũ để buộc sinh hình ảnh mới hoàn toàn ở lượt sau
-            session()->forget('captcha_code');
-
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
             ]);
         }
 
         RateLimiter::clear($this->throttleKey());
-
-        session()->forget('login_attempts');
     }
 
     /**

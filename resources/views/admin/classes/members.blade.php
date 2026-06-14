@@ -4,20 +4,6 @@
 
 @section('admin_content')
 <div class="container-fluid py-4">
-    
-    {{-- Khối thông báo hệ thống --}}
-    @if(session('success'))
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            {{ session('success') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
-    @if(session('error'))
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            {{ session('error') }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    @endif
 
     {{-- CONTAINER 1: DANH SÁCH THÀNH VIÊN LỚP --}}
     <div id="memberListContainer" style="{{ isset($previewMembers) ? 'display: none;' : 'display: block;' }}">
@@ -31,16 +17,28 @@
             <h4 class="fw-bold" style="letter-spacing: 0.5px; color: #990000 !important;">CHI TIẾT THÀNH VIÊN LỚP HỌC</h4>
         </div>
 
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div class="position-relative" style="width: 320px;">
-                <span class="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
-                    <i class="bi bi-search"></i>
-                </span>
-                <input type="text" class="form-control ps-5 border-secondary-subtle" placeholder="Tìm kiếm theo mã hoặc tên..." style="border-radius: 6px; height: 42px;">
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px;">
+            <div class="card-body p-3">
+                <form method="GET" action="{{ route('admin.classes.members', $class->id) }}" class="row g-2 align-items-center">
+                    <div class="col-md-4 position-relative">
+                        <span class="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" name="search" value="{{ $search ?? request('search') }}" placeholder="Tìm theo mã hoặc tên..." class="form-control ps-5 border-secondary-subtle" style="height: 42px; border-radius: 6px;">
+                    </div>
+                    <div class="col-md-auto">
+                        <button type="submit" class="btn btn-dark fw-semibold px-4" style="height: 42px; border-radius: 6px;">Lọc</button>
+                        @if(($search ?? request('search')))
+                            <a href="{{ route('admin.classes.members', $class->id) }}" class="btn btn-light border ms-1 fw-semibold text-secondary" style="height: 42px; border-radius: 6px;">Xóa bộ lọc</a>
+                        @endif
+                    </div>
+                    <div class="col-md-auto ms-auto">
+                        <button type="button" onclick="switchToAction('add')" class="btn fw-semibold shadow-sm" style="background-color: #FEE2E2; border: 1px solid #FCA5A5; color: #990000; padding: 8px 24px; border-radius: 4px;">
+                            Thêm thành viên
+                        </button>
+                    </div>
+                </form>
             </div>
-            <button onclick="switchToAction('add')" class="btn fw-semibold shadow-sm" style="background-color: #FEE2E2; border: 1px solid #FCA5A5; color: #990000; padding: 8px 24px; border-radius: 4px;">
-                Thêm thành viên
-            </button>
         </div>
 
         <div class="table-responsive shadow-sm" style="border-radius: 8px;">
@@ -110,9 +108,19 @@
         <div id="tabSingleContent" class="mx-auto card p-4 shadow-sm border-0" style="max-width: 500px; background-color: #FFFBEB; {{ isset($previewMembers) ? 'display: none;' : 'display: block;' }}">
             <form action="{{ route('admin.classes.members.add_single', $class->id) }}" method="POST">
                 @csrf
-                <div class="mb-3">
-                    <label class="form-label fw-bold text-dark">Nhập Mã số tài khoản (User ID)</label>
-                    <input type="text" id="singleMemberCode" name="id" class="form-control border-secondary-subtle" style="background-color: #FEF3C7; height: 44px;" placeholder="Ví dụ: M002174..." required>
+                <div class="mb-3 position-relative">
+                    <label for="singleMemberCode" class="form-label fw-semibold text-secondary">Nhập mã định danh tài khoản <span class="text-danger">*</span></label>
+                    <input type="text" 
+                        class="form-control" 
+                        id="singleMemberCode" 
+                        name="user_id" 
+                        placeholder="Tên hoặc Email để tìm kiếm..." 
+                        autocomplete="off" 
+                        style="height: 44px;">
+                    
+                    {{-- Danh sách kết quả gợi ý (Mới thêm) --}}
+                    <div id="searchSuggestions" class="list-group shadow-sm position-absolute w-100 mt-1 d-none" style="z-index: 1050; max-height: 250px; overflow-y: auto;">
+                        </div>
                 </div>
                 <div class="text-center">
                     <button type="submit" class="btn text-white fw-bold px-4 shadow-sm" style="background-color: #990000; height: 42px;">Xác nhận thêm</button>
@@ -246,5 +254,76 @@
         closeExitModal();
         switchToAction('list');
     }
+
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('singleMemberCode');
+        const suggestionsBox = document.getElementById('searchSuggestions');
+        let debounceTimeout = null;
+
+        if (searchInput && suggestionsBox) {
+            searchInput.addEventListener('input', function() {
+                const query = this.value.trim();
+                
+                // Xóa thời gian chờ cũ nếu người dùng đang gõ liên tục để tránh spam request
+                clearTimeout(debounceTimeout);
+
+                if (query.length < 2) {
+                    suggestionsBox.classList.add('d-none');
+                    suggestionsBox.innerHTML = '';
+                    return;
+                }
+
+                // Chờ người dùng dừng gõ phím 300ms rồi mới gửi request đi
+                debounceTimeout = setTimeout(() => {
+                    const searchUrl = "{{ route('admin.classes.search_users', $class->id) }}?q=" + encodeURIComponent(query);
+
+                    fetch(searchUrl)
+                        .then(response => response.json())
+                        .then(users => {
+                            suggestionsBox.innerHTML = '';
+
+                            if (users.length === 0) {
+                                suggestionsBox.innerHTML = `<div class="list-group-item text-muted py-2 small">Không tìm thấy tài khoản thích hợp hoặc đã có trong lớp</div>`;
+                                suggestionsBox.classList.remove('d-none');
+                                return;
+                            }
+
+                            // Đổ dữ liệu tìm kiếm được vào dropdown danh sách
+                            users.forEach(user => {
+                                const item = document.createElement('a');
+                                item.href = '#';
+                                item.className = 'list-group-item list-group-item-action py-2 d-flex justify-content-between align-items-center';
+                                item.innerHTML = `
+                                    <div>
+                                        <strong class="text-dark d-block mb-0">${user.name}</strong>
+                                        <span class="text-muted small">${user.email}</span>
+                                    </div>
+                                    <span class="badge bg-secondary font-monospace">${user.id}</span>
+                                `;
+
+                                // Khi người dùng bấm chuột chọn 1 kết quả cụ thể
+                                item.addEventListener('click', function(e) {
+                                    e.preventDefault();
+                                    searchInput.value = user.id; // Tự động điền Mã tài khoản vào ô input
+                                    suggestionsBox.classList.add('d-none'); // Ẩn danh sách gợi ý đi
+                                });
+
+                                suggestionsBox.appendChild(item);
+                            });
+
+                            suggestionsBox.classList.remove('d-none');
+                        })
+                        .catch(error => console.error('Lỗi tìm kiếm:', error));
+                }, 300);
+            });
+
+            // Ẩn danh sách gợi ý nếu người dùng click chuột ra vùng bên ngoài
+            document.addEventListener('click', function(e) {
+                if (!searchInput.contains(e.target) && !suggestionsBox.contains(e.target)) {
+                    suggestionsBox.classList.add('d-none');
+                }
+            });
+        }
+    });
 </script>
 @endsection
