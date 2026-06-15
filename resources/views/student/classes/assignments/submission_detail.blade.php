@@ -6,13 +6,13 @@
 <div class="container-fluid p-0">
     <div class="mb-3">
         <a href="{{ route('student.classes.assignments.detail', [$class->id, $distribution->id]) }}" class="btn btn-sm btn-light border">
-            <i class="bi bi-arrow-left"></i> Quay lại lịch sử bài làm
+            <i class="bi bi-arrow-left me-1"></i> Quay lại lịch sử bài làm
         </a>
     </div>
 
     <div class="card shadow-sm border-0 mb-4 bg-white rounded">
-        <div class="card-header bg-dark text-white fw-bold py-3">
-            <i class="bi bi-card-checklist me-1"></i> KẾT QUẢ TỔNG QUAN LƯỢT LÀM BÀI #{{ $submission->attempt_number }}
+        <div class="card-header text-dark fw-bold py-3">
+            KẾT QUẢ TỔNG QUAN LƯỢT LÀM BÀI #{{ $submission->attempt_number }}
         </div>
         <div class="card-body p-4">
             <div class="row text-center g-3">
@@ -44,7 +44,7 @@
 
             @if($submission->teacher_comment)
                 <div class="mt-4 p-3 border-start border-warning bg-light rounded">
-                    <strong class="text-dark d-block mb-1"><i class="bi bi-chat-left-text-fill text-warning me-1"></i> Nhận xét từ Giáo viên:</strong>
+                    <strong class="text-dark d-block mb-1">Nhận xét từ Giáo viên:</strong>
                     <p class="mb-0 text-muted italic">"{{ $submission->teacher_comment }}"</p>
                 </div>
             @endif
@@ -53,7 +53,7 @@
 
     <div class="card shadow-sm border-0">
         <div class="card-header bg-white fw-bold border-bottom py-3 text-dark">
-            <i class="bi bi-list-task me-1"></i> CHI TIẾT ĐÁP ÁN BÀI LÀM
+            CHI TIẾT ĐÁP ÁN BÀI LÀM
         </div>
         <div class="card-body p-4">
             @foreach($questions as $question)
@@ -127,6 +127,15 @@
                     @endif
                 </div>
             @endforeach
+        </div>
+    </div>
+    <div class="card shadow-sm border-0 mt-4 bg-white rounded">
+        <div class="card-body p-4 text-center">
+            <h5 class="fw-bold text-dark mb-2">Bạn có thắc mắc hoặc phản hồi về bài chấm này?</h5>
+            <p class="text-muted fs-7 mb-3">Hệ thống hỗ trợ trao đổi trực tiếp với Giảng viên/Trợ giảng phụ trách lớp học thông qua hộp thoại riêng.</p>
+            <a href="{{ route('student.classes.assignments.submissions.feedback', [$class->id, $distribution->id, $submission->id]) }}" class="btn btn-primary fw-bold px-4 shadow-sm">
+                Mở khung chat phản hồi
+            </a>
         </div>
     </div>
 </div>

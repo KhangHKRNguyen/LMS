@@ -11,9 +11,22 @@
     .disabled-session { background-color: #f8f9fa; color: #6c757d; }
 </style>
 
-<div class="mb-3">
-    <h5 class="fw-bold m-0 text-dark">QUẢN LÝ LỚP HỌC - {{ $class->class_name }}</h5>
-    <small class="text-muted fw-semibold">Khóa học chuyên môn: {{ $class->course->name ?? 'N/A' }}</small>
+{{-- 1. BỔ SUNG DROPDOWN BỘ LỌC BUỔI (Giao diện Flex chia đôi tiêu đề và bộ lọc) --}}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h5 class="fw-bold m-0 text-dark">QUẢN LÝ LỚP HỌC - {{ $class->class_name }}</h5>
+        <small class="text-muted fw-semibold">Khóa học chuyên môn: {{ $class->course->name ?? 'N/A' }}</small>
+    </div>
+    <div>
+        <select id="session-filter" class="form-select form-select-sm border-danger fw-semibold text-dark" style="width: 160px;">
+            <option value="all">-- Tất cả các buổi --</option>
+            @foreach($lessonSessions as $index => $session)
+                <option value="{{ $session->id }}">
+                    Buổi {{ $index + 1 }} ({{ \Carbon\Carbon::parse($session->lesson_date)->format('d/m/Y') }})
+                </option>
+            @endforeach
+        </select>
+    </div>
 </div>
 
 <div class="card border-0 shadow-sm">
@@ -26,9 +39,10 @@
                         <tr>
                             <th rowspan="2" style="width: 50px;">STT</th>
                             <th rowspan="2" style="min-width: 180px;">Họ và tên</th>
-                            {{-- Tiêu đề các buổi học --}}
+                            
+                            {{-- 2. THÊM CLASS 'session-col' VÀ 'data-session-id' VÀO TIÊU ĐỀ LỚN --}}
                             @foreach($lessonSessions as $index => $session)
-                                <th colspan="2" class="{{ !$session->is_editable ? 'bg-secondary text-white' : '' }}">
+                                <th colspan="2" class="session-col {{ !$session->is_editable ? 'bg-secondary text-white' : '' }}" data-session-id="{{ $session->id }}">
                                     Buổi {{ $index + 1 }} <br>
                                     <small style="font-size: 11px;">({{ \Carbon\Carbon::parse($session->lesson_date)->format('d/m') }})</small>
                                     @if(!$session->is_editable)
@@ -40,10 +54,10 @@
                             <th rowspan="2" style="width: 110px;">Cảnh báo</th>
                         </tr>
                         <tr>
-                            {{-- Các cột con Có mặt / Vắng --}}
+                            {{-- 3. THÊM CLASS 'session-col' VÀ 'data-session-id' VÀO TIÊU ĐỀ CON (ĐỦ / VẮNG) --}}
                             @foreach($lessonSessions as $session)
-                                <th style="font-size: 11px; padding: 4px;">Đủ</th>
-                                <th style="font-size: 11px; padding: 4px;">Vắng</th>
+                                <th class="session-col" data-session-id="{{ $session->id }}" style="font-size: 11px; padding: 4px;">Đủ</th>
+                                <th class="session-col" data-session-id="{{ $session->id }}" style="font-size: 11px; padding: 4px;">Vắng</th>
                             @endforeach
                         </tr>
                     </thead>
@@ -56,15 +70,11 @@
 
                                 @foreach($lessonSessions as $session)
                                     @php
-                                        // Lấy trạng thái lưu trong Database nếu có
                                         $dbStatus = $attendanceMatrix[$student->id][$session->id] ?? null;
 
                                         if ($session->is_editable) {
-                                            // Nếu trong ngưỡng cho phép chỉnh sửa: Default là 'present' nếu DB chưa có dữ liệu
                                             $currentStatus = $dbStatus ?? 'present';
                                         } else {
-                                            // Nếu NGOÀI ngưỡng cho phép chỉnh sửa: 
-                                            // Đã qua ngày hoặc chưa tới ngày, nếu trước đó không có dữ liệu vắng thì tính là "Mặc định Đủ"
                                             $currentStatus = $dbStatus ?? 'present';
                                         }
 
@@ -73,8 +83,8 @@
                                         }
                                     @endphp
 
-                                    {{-- Ô Chọn Có Mặt --}}
-                                    <td class="{{ !$session->is_editable ? 'disabled-session' : '' }}">
+                                    {{-- 4. THÊM CLASS 'session-col' VÀ 'data-session-id' VÀO Ô CHỌN CÓ MẶT --}}
+                                    <td class="session-col {{ !$session->is_editable ? 'disabled-session' : '' }}" data-session-id="{{ $session->id }}">
                                         <input type="radio" 
                                                name="attendance[{{ $session->id }}][{{ $student->id }}]" 
                                                value="present" 
@@ -83,8 +93,8 @@
                                                {{ !$session->is_editable ? 'disabled' : '' }}>
                                     </td>
 
-                                    {{-- Ô Chọn Vắng Mặt --}}
-                                    <td class="{{ !$session->is_editable ? 'disabled-session' : '' }}">
+                                    {{-- 5. THÊM CLASS 'session-col' VÀ 'data-session-id' VÀO Ô CHỌN VẮNG MẶT --}}
+                                    <td class="session-col {{ !$session->is_editable ? 'disabled-session' : '' }}" data-session-id="{{ $session->id }}">
                                         <input type="radio" 
                                                name="attendance[{{ $session->id }}][{{ $student->id }}]" 
                                                value="absent" 
@@ -94,7 +104,6 @@
                                     </td>
                                 @endforeach
 
-                                {{-- Tính toán hiển thị tổng số buổi vắng --}}
                                 <td class="fw-bold text-dark">{{ $totalAbsent }}</td>
                                 <td>
                                     @if($totalAbsent >= 5)
@@ -127,4 +136,28 @@
         </form>
     </div>
 </div>
+
+{{-- 6. ĐOẠN JAVASCRIPT LOGIC ĐƯỢC SAO CHÉP NGUYÊN BẢN TỪ BÊN GIÁO VIÊN --}}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const sessionFilter = document.getElementById('session-filter');
+    const sessionColumns = document.querySelectorAll('.session-col');
+
+    sessionFilter.addEventListener('change', function () {
+        const selectedSessionId = this.value;
+
+        sessionColumns.forEach(col => {
+            if (selectedSessionId === 'all') {
+                col.style.display = ''; 
+            } else {
+                if (col.getAttribute('data-session-id') === selectedSessionId) {
+                    col.style.display = '';
+                } else {
+                    col.style.display = 'none';
+                }
+            }
+        });
+    });
+});
+</script>
 @endsection

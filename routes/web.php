@@ -20,6 +20,7 @@ use App\Http\Controllers\TA\AttendanceController;
 use App\Http\Controllers\TA\LeaveRequestController;
 
 use App\Http\Controllers\Student\ClassController as StudentClassController;
+use App\Http\Controllers\Student\LeaveRequestController as StudentLeaveRequestController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -56,7 +57,6 @@ Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->grou
 
     Route::resource('courses', CourseController::class);
 
-    // Routes cho quản lý thành viên lớp
     Route::get('classes/{class}/members', [ClassController::class, 'members'])->name('classes.members');
     Route::post('classes/{class}/members/preview', [ClassController::class, 'previewMembers'])->name('classes.members.preview');
     Route::post('classes/{class}/members/store-bulk', [ClassController::class, 'storeBulkMembers'])->name('classes.members.store_bulk');
@@ -78,7 +78,7 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
 
     Route::get('/classes/{class}/students', [ClassroomController::class, 'students'])->name('classroom.students');
 
-    Route::get('/classes/{class}/summary', [ClassroomSummaryController::class, 'summary'])->name('classroom.summary');
+    Route::get('/classes/{class}/summary', [ClassroomSummaryController::class, 'index'])->name('classroom.summary');
 
     Route::resource('exams', ExamController::class);
 
@@ -97,10 +97,14 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->name('teacher.')
     Route::get('/classes/{class}/submissions/{submission}/grade', [SubmissionController::class, 'grade'])->name('submissions.grade');
     Route::post('/classes/{class}/submissions/{submission}/post-grade', [SubmissionController::class, 'postGrade'])->name('submissions.post_grade');
 
+    Route::get('/classes/{class}/submissions/{submission}/feedback', [SubmissionController::class, 'feedbackChat'])->name('submissions.feedback');
+    Route::post('/classes/{class}/submissions/{submission}/feedback/send', [SubmissionController::class, 'sendFeedback'])->name('submissions.feedback.send');
+
     Route::get('/classes/{class}/materials', [MaterialController::class, 'index'])->name('materials.index');
     Route::get('/materials/{material}/download', [MaterialController::class, 'download'])->name('materials.download');
     Route::post('/materials/store', [MaterialController::class, 'store'])->name('materials.store');
     Route::delete('/materials/{material}', [MaterialController::class, 'destroy'])->name('materials.destroy');
+
 });
 
 Route::middleware(['auth', 'role:ta'])->prefix('ta')->name('ta.')->group(function () {
@@ -112,15 +116,21 @@ Route::middleware(['auth', 'role:ta'])->prefix('ta')->name('ta.')->group(functio
     Route::get('/classes/{class}/leave-requests', [LeaveRequestController::class, 'index'])->name('classes.leave_requests');
     Route::put('/leave-requests/{id}', [LeaveRequestController::class, 'update'])->name('leave_requests.update');
 
-    Route::get('/classes/{class}/summary', function($id) { return "Giao diện kết quả tổng kết lớp của TA đang phát triển"; })->name('classes.summary');
+    Route::get('/classes/{class}/summary', [TAClassController::class, 'summary'])->name('classes.summary');
+    Route::post('/classes/{class}/summary/approve', [TAClassController::class, 'approveSummary'])->name('classes.summary.approve');
 });
 
 Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')->group(function () {
     Route::get('/dashboard', [StudentClassController::class, 'index'])->name('dashboard');
     
-    Route::get('/leave-requests', function() { 
-        return "Giao diện quản lý đơn của Học viên đang phát triển"; 
-    })->name('leave_requests.index');
+    Route::prefix('leave-requests')->name('leave_requests.')->group(function () {
+        Route::get('/', [StudentLeaveRequestController::class, 'index'])->name('index');
+        Route::post('/store', [StudentLeaveRequestController::class, 'store'])->name('store');
+        Route::put('/{id}/update', [StudentLeaveRequestController::class, 'update'])->name('update');
+        Route::patch('/{id}/submit', [StudentLeaveRequestController::class, 'submit'])->name('submit');
+        Route::patch('/{id}/withdraw', [StudentLeaveRequestController::class, 'withdraw'])->name('withdraw');
+        Route::delete('/{id}/delete', [StudentLeaveRequestController::class, 'destroy'])->name('destroy');
+    });
 
     Route::get('/classes/{class}', [StudentClassController::class, 'show'])->name('classes.show');
     Route::get('/classes/{class}/assignments/{distribution}', [StudentClassController::class, 'assignmentDetail'])->name('classes.assignments.detail');
@@ -129,7 +139,13 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
     Route::post('/classes/{class}/assignments/{distribution}/submit', [StudentClassController::class, 'submitAssignment'])->name('classes.assignments.submit');
     Route::get('/classes/{class}/assignments/{distribution}/submissions/{submission}', [StudentClassController::class, 'viewSubmission'])->name('classes.assignments.submissions.show');
 
+
     Route::get('/classes/{class}/materials', [StudentClassController::class, 'materials'])->name('classes.materials');
+    Route::get('/materials/{material}/download', [StudentClassController::class, 'downloadMaterial'])->name('classes.materials.download');
+    
     Route::get('/classes/{class}/summary', [StudentClassController::class, 'summary'])->name('classes.summary');
+
+    Route::get('/classes/{class}/assignments/{distribution}/submissions/{submission}/feedback', [StudentClassController::class, 'feedbackChat'])->name('classes.assignments.submissions.feedback');
+    Route::post('/classes/{class}/assignments/{distribution}/submissions/{submission}/feedback/send', [StudentClassController::class, 'sendFeedback'])->name('classes.assignments.submissions.feedback.send');
 });
 require __DIR__.'/auth.php';

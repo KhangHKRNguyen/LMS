@@ -3,36 +3,28 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use App\Models\User;
+use App\Models\Submission;
 
 class Feedback extends Model
 {
-    // Chỉ định chính xác tên bảng trong Seeder
-    protected $table = 'feedback';
+    protected $table = 'feedbacks';
 
     protected $fillable = [
-        'feedback_content',
-        'old_grade',
-        'new_grade',
-        'teacher_reply',
-        'teacher_replied_at',
-        'submission_id',
+        'content',
         'user_id',
+        'submission_id'
     ];
 
-    /**
-     * Phản hồi này thuộc về một bài nộp nào
-     */
-    public function submission(): BelongsTo
-    {
-        return $this->belongsTo(Submission::class, 'submission_id');
-    }
-
-    /**
-     * Phản hồi này do ai viết (Học viên hoặc Giáo viên)
-     */
-    public function user(): BelongsTo
+    // Mối quan hệ với người gửi tin nhắn (User)
+    public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    // Mối quan hệ ngược lại với Bài nộp (Submission)
+    public function submission()
+    {
+        return $this->belongsTo(Submission::class, 'submission_id');
     }
 }

@@ -94,7 +94,7 @@
                             </td>
                             <td>
                                 @if($distribution->close_time && now()->gt($distribution->close_time))
-                                    <a href="{{ route('student.classes.assignments.submissions.show', [$class->id, $distribution->id, $submission->id]) }}" class="btn btn-xs btn-info">
+                                    <a href="{{ route('student.classes.assignments.submissions.show', [$class->id, $distribution->id, $sub->id]) }}" class="btn btn-xs btn-info">
                                         Xem chi tiết
                                     </a>
                                 @else

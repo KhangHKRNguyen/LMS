@@ -9,12 +9,12 @@
 </div>
 
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <div class="position-relative" style="width: 320px;">
+    <form action="{{ route('student.dashboard') }}" method="GET" class="position-relative" style="width: 320px;">
         <span class="position-absolute top-50 start-0 translate-middle-y ps-3 text-muted">
             <i class="bi bi-search"></i>
         </span>
-        <input type="text" class="form-control ps-5 border-secondary-subtle" placeholder="Tìm nhanh mã lớp..." style="border-radius: 6px; height: 42px;">
-    </div>
+        <input type="text" name="search" value="{{ request('search') }}" class="form-control ps-5 border-secondary-subtle" placeholder="Tìm nhanh tên lớp..." style="border-radius: 6px; height: 42px;">
+    </form>
     <div class="text-muted fw-semibold">Học viên: <span class="text-dark">{{ Auth::user()->name }}</span></div>
 </div>
 

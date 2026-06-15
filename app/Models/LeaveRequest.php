@@ -18,6 +18,11 @@ class LeaveRequest extends Model
         'lesson_session_id'
     ];
 
+    protected $casts = [
+        'submitted_at' => 'datetime',
+        'created_at' => 'datetime',
+    ];
+
     // Đơn xin nghỉ này áp dụng riêng cho buổi học nào
     public function lessonSession()
     {

@@ -4,104 +4,97 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\CourseClass;
-use App\Models\Submission;
 use App\Models\Attendance;
+use App\Models\AssignmentDistribution;
+use App\Models\LearningResult;
+use App\Models\LessonSession;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ClassroomSummaryController extends Controller
 {
-    public function summary($classId)
+    /**
+     * Hiển thị bảng tổng kết lớp học dành cho Giảng viên
+     * Logic giống hệt TA nhưng không có approval
+     */
+    public function index($classId)
     {
-        // 1. Lấy thông tin lớp học cùng thông tin khóa học liên kết
-        $courseClass = CourseClass::with('course')->findOrFail($classId);
+        // 1. Lấy thông tin lớp học
+        $class = CourseClass::where('id', $classId)
+            ->with(['course', 'students'])
+            ->firstOrFail();
 
-        // 2. Lấy toàn bộ danh sách bài tập của lớp để phân loại và gom ID nhóm bài
-        $assignments = $courseClass->assignments()->get();
-        $allAssignmentIds = $assignments->pluck('id')->toArray();
+        $students = $class->students;
+        $lessonSessionIds = LessonSession::where('course_class_id', $classId)->pluck('id');
+        $totalStudents = $students->count();
 
-        // Lọc ID các bài Giữa Khóa (Dựa vào type hoặc tiêu đề bài tập)
-        $midtermIds = $assignments->filter(function($item) {
-            $text = mb_strtolower($item->type . ' ' . $item->title);
-            return str_contains($text, 'giua') || str_contains($text, 'giữa');
-        })->pluck('id')->toArray();
+        // 2. Tính toán kết quả cho từng học viên
+        foreach ($students as $student) {
+            // Tính số buổi nghỉ
+            $student->total_absent = Attendance::where('user_id', $student->id)
+                ->whereIn('lesson_session_id', $lessonSessionIds)
+                ->whereIn('status', ['absent', 'Vắng'])
+                ->count();
 
-        // Lọc ID các bài Cuối Khóa
-        $finalIds = $assignments->filter(function($item) {
-            $text = mb_strtolower($item->type . ' ' . $item->title);
-            return str_contains($text, 'cuoi') || str_contains($text, 'cuối');
-        })->pluck('id')->toArray();
-
-        // 3. Phân trang danh sách học viên hiển thị trên table (15 học viên / trang)
-        $studentsPaginator = $courseClass->students()->paginate(15);
-
-        // Lấy tất cả học viên không phân trang để tính toán cục thống kê trên Top Card
-        $allStudents = $courseClass->students()->get();
-
-        // Đóng gói hàm Closure tái sử dụng tính toán chỉ số cho từng học viên
-        $calculateStudentMetrics = function($student) use ($allAssignmentIds, $midtermIds, $finalIds, $courseClass) {
-            // Lấy điểm giữa khóa cao nhất
-            $student->midterm_grade = Submission::where('user_id', $student->id)
-                ->whereIn('assignment_id', $midtermIds)
-                ->max('grade');
-
-            // Lấy điểm cuối khóa cao nhất
-            $student->final_grade = Submission::where('user_id', $student->id)
-                ->whereIn('assignment_id', $finalIds)
-                ->max('grade');
-
-            // Đếm tổng số buổi nghỉ thông qua các Buổi học của lớp này
-            $student->total_absences = Attendance::where('user_id', $student->id)
-                ->whereHas('lessonSession', function($q) use ($courseClass) {
-                    $q->where('course_class_id', $courseClass->id);
+            // Tính số bài tập thiếu
+            $student->total_missing = AssignmentDistribution::whereIn('lesson_session_id', $lessonSessionIds)
+                ->where('close_time', '<', now())
+                ->whereNotExists(function ($query) use ($student) {
+                    $query->select(DB::raw(1))
+                        ->from('submissions')
+                        ->whereColumn('submissions.assignment_distribution_id', 'assignment_distributions.id')
+                        ->where('submissions.user_id', $student->id);
                 })
-                ->whereIn('status', ['absent', 'vắng', 'Vắng'])
                 ->count();
 
-            // Đếm số bài thiếu (Hệ thống tự nộp chấm 0 điểm)
-            $student->total_missing = Submission::where('user_id', $student->id)
-                ->whereIn('assignment_id', $allAssignmentIds)
-                ->where('grade', 0)
-                ->count();
+            // Lấy điểm từ learning_results
+            $learningResult = LearningResult::where('user_id', $student->id)
+                ->where('course_class_id', $classId)
+                ->first();
 
-            // XỬ LÝ LOGIC ĐẦU RA (Theo mô tả luật văn bản của bạn)
-            $finalScore = $student->final_grade ?? 0.0;
-            $hasExceededLimits = ($student->total_absences >= 5 || $student->total_missing >= 9);
+            $student->midterm_grade = $learningResult ? $learningResult->midterm_grade : null;
+            $student->final_grade = $learningResult ? $learningResult->final_grade : null;
+            $student->approval_status = $learningResult ? $learningResult->approval_status : 'Chờ';
 
-            if ($hasExceededLimits && $finalScore < 5.0) {
-                $student->output_status = 'Không đạt'; // TH1
-            } elseif ($hasExceededLimits && $finalScore >= 5.0) {
-                $student->output_status = 'Đạt'; // TH2
-            } else {
-                // TH3: Không vi phạm chuyên cần. Đạt hay không phụ thuộc điểm cuối khóa
-                $student->output_status = ($finalScore >= 5.0) ? 'Đạt' : 'Không đạt';
-            }
+            // Tính output_status
+            $outputOverall = (float)($class->course->output_overall ?? 0);
+            $finalGrade = $student->final_grade !== null ? (float)$student->final_grade : null;
 
-            /* // Cấu hình B: Nếu muốn chạy ĐÚNG THEO ẢNH MOCKUP (Vi phạm chuyên cần = Trượt luôn)
-            if ($hasExceededLimits || $finalScore < 5.0) {
+            $isConditionBreached = ($student->total_absent >= 5 || $student->total_missing >= 9);
+            $isGradeAchieved = ($finalGrade !== null && $finalGrade >= $outputOverall);
+
+            if ($isConditionBreached && !$isGradeAchieved) {
                 $student->output_status = 'Không đạt';
             } else {
                 $student->output_status = 'Đạt';
             }
-            */
+        }
 
-            return $student;
-        };
-
-        // Áp dụng tính toán cho danh sách phân trang hiển thị
-        $studentsPaginator->getCollection()->transform($calculateStudentMetrics);
-
-        // Áp dụng tính toán toàn bộ lớp để lấy dữ liệu làm Top Card
-        $allProcessedStudents = $allStudents->map($calculateStudentMetrics);
+        // 3. Tính toán dữ liệu thống kê cho Dashboard
+        $passedCount = $students->where('output_status', 'Đạt')->count();
+        $failedCount = $students->where('output_status', 'Không đạt')->count();
         
-        $stats = [
-            'total_students' => $allProcessedStudents->count(),
-            'completed_count' => $allProcessedStudents->where('output_status', 'Đạt')->count(),
-            'avg_final_grade' => round($allProcessedStudents->where('final_grade', '!==', null)->avg('final_grade'), 1),
-            'pass_rate'       => $allProcessedStudents->count() > 0 
-                ? round(($allProcessedStudents->where('output_status', 'Đạt')->count() / $allProcessedStudents->count()) * 100, 1) 
-                : 0
+        $passRate = $totalStudents > 0 ? round(($passedCount / $totalStudents) * 100, 1) : 0;
+        $failRate = $totalStudents > 0 ? round(($failedCount / $totalStudents) * 100, 1) : 0;
+        
+        $validFinalGrades = $students->whereNotNull('final_grade');
+        $avgFinalGrade = $validFinalGrades->count() > 0 ? round($validFinalGrades->avg('final_grade'), 2) : 0;
+        $totalStudentsMissing = $students->where('total_missing', '>', 0)->count();
+
+        // 4. Dữ liệu biểu đồ
+        $chartData = [
+            'labels'   => $students->pluck('name')->toArray(),
+            'absents'  => $students->pluck('total_absent')->toArray(),
+            'missings' => $students->pluck('total_missing')->toArray(),
+            'passed'   => $passedCount,
+            'failed'   => $failedCount,
         ];
 
-        return view('teacher.summary.index', compact('courseClass', 'studentsPaginator', 'stats', 'assignments', 'midtermIds', 'finalIds'));
+        return view('teacher.classes.summary', compact(
+            'class', 'students', 
+            'totalStudents', 'passedCount', 'failedCount', 
+            'passRate', 'failRate', 'avgFinalGrade', 'totalStudentsMissing', 'chartData'
+        ));
     }
 }

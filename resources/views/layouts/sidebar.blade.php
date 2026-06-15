@@ -22,19 +22,28 @@
                     aria-expanded="false"
                     style="cursor: pointer;"
                 >
-                    <img
-                        src="https://ui-avatars.com/api/?name=Admin&background=990000&color=fff"
-                        alt="Avatar"
-                        class="rounded-circle"
-                        style="width: 38px; height: 38px; border: 2px solid var(--primary-color);"
-                    >
+                    @if(Auth::user()->avatar)
+                        <img
+                            src="{{ asset('storage/' . Auth::user()->avatar) }}"
+                            alt="Avatar"
+                            class="rounded-circle object-fit-cover"
+                            style="width: 38px; height: 38px; border: 2px solid #990000;"
+                        >
+                    @else
+                        <div
+                            class="rounded-circle d-flex align-items-center justify-content-center fw-bold text-white"
+                            style="width: 38px; height: 38px; background-color: #990000; font-size: 16px;"
+                        >
+                            {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                        </div>
+                    @endif
 
                     <div class="text-end">
                         <div class="fw-bold" style="font-size:14px;">
-                            Nguyễn Văn A
+                            {{ Auth::user()->name }}
                         </div>
                         <div class="text-muted" style="font-size:12px;">
-                            Ban đào tạo
+                            {{ Auth::user()->role_text }}
                         </div>
                     </div>
 

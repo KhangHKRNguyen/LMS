@@ -9,6 +9,7 @@ use App\Models\AssignmentDistribution;
 use App\Models\Submission;
 use App\Models\Question;
 use App\Models\QuestionOption;
+use App\Models\Material;
 use App\Services\IeltsScoreService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -17,13 +18,18 @@ use Illuminate\Support\Facades\Storage;
 class ClassController extends Controller
 {
     // Danh sách lớp học ngoài Dashboard
-    public function index()
+    public function index(Request $request)
     {
+        $search = trim($request->input('search', ''));
+
         $classes = CourseClass::whereHas('users', function ($query) {
             $query->where('user_id', Auth::id());
         })
         ->with(['course'])
         ->withCount('students')
+        ->when($search, function ($query) use ($search) {
+            return $query->where('class_name', 'LIKE', "%{$search}%");
+        })
         ->get();
 
         return view('student.dashboard', compact('classes'));
@@ -284,6 +290,184 @@ class ClassController extends Controller
         ));
     }
 
-    public function materials(CourseClass $class) { return "Tính năng tài liệu đang cập nhật."; }
-    public function summary($id) { return "Tính năng kết quả học tập đang cập nhật."; }
+    public function feedbackChat(CourseClass $class, AssignmentDistribution $distribution, $submissionId)
+    {
+        if (!$class->users()->where('user_id', Auth::id())->exists()) {
+            abort(403, 'Bạn không có quyền truy cập.');
+        }
+
+        $submission = $distribution->submissions()
+            ->where('user_id', Auth::id())
+            ->where('id', $submissionId)
+            ->firstOrFail();
+
+        // Lấy lịch sử đoạn chat của bài làm này
+        $chats = \App\Models\Feedback::where('submission_id', $submission->id)
+            ->with('user')
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return view('student.classes.assignments.feedback', compact('class', 'distribution', 'submission', 'chats'));
+    }
+
+    // Xử lý gửi tin nhắn từ Học viên
+    public function sendFeedback(Request $request, $classId, $distributionId, $submissionId)
+    {
+        $request->validate([
+            'content' => 'required|string|max:1000',
+        ]);
+
+        // Đảm bảo đúng bài làm của chính học viên này
+        $submission = Submission::where('user_id', Auth::id())
+            ->where('id', $submissionId)
+            ->firstOrFail();
+
+        \App\Models\Feedback::create([
+            'content' => $request->input('content'),
+            'user_id' => Auth::id(),
+            'submission_id' => $submission->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Gửi phản hồi đến giảng viên thành công!');
+    }
+
+    public function materials(Request $request, $classId)
+    {
+        $student = Auth::user();
+
+        // Xác thực học viên có thuộc lớp học này không để bảo mật dữ liệu
+        $class = CourseClass::where('id', $classId)
+            ->whereHas('users', fn($q) => $q->where('user_id', $student->id))
+            ->firstOrFail();
+
+        $search     = $request->get('search', '');
+        $filterType = $request->get('type', '');
+
+        // 1. Thống kê số lượng file theo từng định dạng từ toàn bộ tài liệu của lớp
+        $allMaterials = $class->materials()->get();
+        $stats = [
+            'total' => $allMaterials->count(),
+            'pdf'   => $allMaterials->filter(fn($m) => strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)) === 'pdf')->count(),
+            'word'  => $allMaterials->filter(fn($m) => in_array(strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)), ['doc', 'docx']))->count(),
+            'excel' => $allMaterials->filter(fn($m) => in_array(strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)), ['xls', 'xlsx']))->count(),
+            'ppt'   => $allMaterials->filter(fn($m) => in_array(strtolower(pathinfo($m->file_path, PATHINFO_EXTENSION)), ['ppt', 'pptx']))->count(),
+        ];
+
+        // 2. Tạo query lấy danh sách tài liệu chính có áp dụng tìm kiếm & bộ lọc dropdown
+        $query = $class->materials();
+
+        if (!empty($search)) {
+            $query->where('title', 'like', '%' . $search . '%');
+        }
+
+        if (!empty($filterType)) {
+            switch ($filterType) {
+                case 'pdf':
+                    $query->where('file_path', 'like', '%.pdf');
+                    break;
+                case 'word':
+                    $query->where(fn($q) => $q->where('file_path', 'like', '%.doc')->orWhere('file_path', 'like', '%.docx'));
+                    break;
+                case 'excel':
+                    $query->where(fn($q) => $q->where('file_path', 'like', '%.xls')->orWhere('file_path', 'like', '%.xlsx'));
+                    break;
+                case 'powerpoint':
+                    $query->where(fn($q) => $q->where('file_path', 'like', '%.ppt')->orWhere('file_path', 'like', '%.pptx'));
+                    break;
+                case 'image':
+                    $query->where(fn($q) => $q->where('file_path', 'like', '%.jpg')->orWhere('file_path', 'like', '%.jpeg')->orWhere('file_path', 'like', '%.png'));
+                    break;
+                case 'archive':
+                    $query->where(fn($q) => $q->where('file_path', 'like', '%.zip')->orWhere('file_path', 'like', '%.rar'));
+                    break;
+            }
+        }
+
+        // Phân trang dữ liệu giống như bên giáo viên
+        $materials = $query->orderBy('created_at', 'desc')->paginate(10);
+
+        return view('student.materials.index', compact('class', 'materials', 'stats', 'search', 'filterType'));
+    }
+
+    /**
+     * Xử lý tải tài liệu an toàn cho Học viên
+     */
+    public function downloadMaterial(Material $material)
+    {
+        $student = Auth::user();
+
+        // Kiểm tra xem học viên có thực sự thuộc lớp sở hữu tài liệu này không
+        CourseClass::whereHas('users', fn($q) => $q->where('user_id', $student->id))
+            ->findOrFail($material->course_class_id);
+
+        if (!Storage::disk('public')->exists($material->file_path)) {
+            return back()->with('error', 'Tệp tin không tồn tại hoặc đã bị xóa khỏi hệ thống.');
+        }
+
+        $fullPath = Storage::disk('public')->path($material->file_path);
+        $ext      = pathinfo($material->file_path, PATHINFO_EXTENSION);
+        $fileName = $material->title . '.' . $ext;
+
+        return response()->download($fullPath, $fileName);
+    }
+
+    /**
+     * Hiển thị kết quả tổng kết cá nhân của Học viên
+     */
+    public function summary(CourseClass $class)
+    {
+        $student = Auth::user();
+        $classId = $class->id;
+
+        // 2. Lấy kết quả học tập từ bảng learning_results
+        $learningResult = \App\Models\LearningResult::where('user_id', $student->id)
+            ->where('course_class_id', $classId)
+            ->first();
+
+        // 3. Kiểm tra logic phê duyệt: Phải tồn tại bản ghi và có trạng thái là 'Đã duyệt'
+        $isApproved = $learningResult && $learningResult->approval_status === 'Đã duyệt';
+
+        // 4. Tính toán dữ liệu chuyên cần & bài tập thực tế để hiển thị chi tiết cho học viên
+        $lessonSessionIds = \App\Models\LessonSession::where('course_class_id', $classId)->pluck('id');
+        
+        // Tính số buổi vắng
+        $totalAbsent = \App\Models\Attendance::where('user_id', $student->id)
+            ->whereIn('lesson_session_id', $lessonSessionIds)
+            ->whereIn('status', ['absent', 'Vắng'])
+            ->count();
+
+        // Tính số bài tập thiếu
+        $distributionIds = \App\Models\AssignmentDistribution::whereIn('lesson_session_id', $lessonSessionIds)->pluck('id');
+        $submittedCount = \App\Models\Submission::where('user_id', $student->id)
+            ->whereIn('assignment_distribution_id', $distributionIds)
+            ->count();
+        $totalMissing = max(0, $distributionIds->count() - $submittedCount);
+
+        $finalGrade = $learningResult ? $learningResult->final_grade : null;
+        $outputOverall = $class->course->output_overall ?? 0;
+
+        $isConditionBreached = ($totalAbsent >= 5 || $totalMissing >= 9);
+        $isGradeAchieved = ($finalGrade !== null && $finalGrade >= $outputOverall);
+
+        // Giữ nguyên bản logic toán tử (&&) chuẩn nghiệp vụ của TA
+        if ($isConditionBreached && !$isGradeAchieved) {
+            $outputStatus = 'Không đạt';
+        } else {
+            $outputStatus = 'Đạt';
+        }
+        // =========================================================================
+
+        // 5. Trả về view tổng kết cá nhân kèm theo các biến trạng thái đầu ra
+        return view('student.classes.summary', compact(
+            'class',
+            'student',
+            'isApproved', 
+            'totalAbsent', 
+            'totalMissing', 
+            'finalGrade', 
+            'outputOverall', 
+            'outputStatus',
+            'learningResult'
+        ));
+    }
 }

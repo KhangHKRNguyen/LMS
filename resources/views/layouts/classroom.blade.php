@@ -21,7 +21,7 @@
             THÔNG TIN CHUNG
         </a>
 
-        {{-- 2. TÀI LIỆU (Thư mục: teacher/materials/document.blade.php) --}}
+        {{-- 2. TÀI LIỆU (Thư mục: teacher/materials/index.blade.php) --}}
         <a href="{{ route('teacher.materials.index', ['class' => $class->id ?? request()->route('class')]) }}"
            class="sidebar-menu-item {{ Request::routeIs('teacher.materials.*') ? 'active' : '' }}">
             TÀI LIỆU
@@ -45,7 +45,7 @@
             BÀI NỘP
         </a>
 
-        {{-- 6. KẾT QUẢ TỔNG KẾT (Thư mục: teacher/summary/index.blade.php) --}}
+        {{-- 6. KẾT QUẢ TỔNG KẾT --}}
         <a href="{{ route('teacher.classroom.summary', $class->id) }}"
            class="sidebar-menu-item {{ Request::routeIs('teacher.classroom.summary') ? 'active' : '' }}">
             KẾT QUẢ TỔNG KẾT

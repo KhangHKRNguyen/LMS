@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CourseClass;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ClassroomController extends Controller
 {
@@ -16,7 +17,6 @@ class ClassroomController extends Controller
         // 1. Lấy lớp học và nạp kèm các buổi học + danh sách bài tập đã giao của buổi đó
         $courseClass = CourseClass::whereHas('users', fn($q) => $q->where('user_id', $teacher->id))
             ->with(['lessonSessions' => function($q) {
-                // Eager Load danh sách phân phối bài tập (assignmentDistributions) của buổi học
                 $q->orderBy('lesson_date', 'asc')->with('assignmentDistributions'); 
             }])
             ->findOrFail($classId);
@@ -51,27 +51,33 @@ class ClassroomController extends Controller
                         $status = 'Đủ';
                     } 
                     else {
-                        // Buổi đó CÓ bài tập -> Kiểm tra xem có bài nào đã quá hạn đóng link (close_time) hay chưa
+                        // Buổi đó CÓ bài tập -> Kiểm tra từng bài xem đã quá hạn hay chưa
                         $hasOverdueAssignment = false;
 
                         foreach ($distributions as $dist) {
-                            // Vì close_time đã được cast là datetime trong Model nên nó là một đối tượng Carbon
+                            // Kiểm tra xem bài tập này đã quá hạn nộp hay chưa
                             if ($dist->close_time && $dist->close_time->isPast()) {
-                                $hasOverdueAssignment = true;
-                                break;
+                                // QUY TẮC 3: Bài tập đã quá hạn nộp
+                                // Kiểm tra xem học viên đã nộp submission cho bài tập này hay chưa
+                                $hasSubmission = DB::table('submissions')
+                                    ->where('assignment_distribution_id', $dist->id)
+                                    ->where('user_id', $student->id)
+                                    ->exists();
+
+                                // Nếu chưa nộp -> tính là Thiếu
+                                if (!$hasSubmission) {
+                                    $hasOverdueAssignment = true;
+                                    break;
+                                }
                             }
                         }
 
                         if ($hasOverdueAssignment) {
-                            // QUY TẮC 3: Có bài tập nhưng đã quá hạn nộp bài (close_time nằm trong quá khứ)
-                            // [HƯỚNG PHÁT TRIỂN KHI LÀM SUBMISSIONS]:
-                            // Sau này khi có bảng submissions, bạn check thêm: 
-                            // Nếu $student đã có bản ghi nộp bài khớp với $dist->id -> $status = 'Đủ'
-                            // Hiện tại chưa làm phần học viên nộp bài, mặc định quá hạn sẽ tính là 'Thiếu'
                             $status = 'Thiếu';
                             $totalMissing++;
                         } else {
-                            // Có bài tập được giao nhưng chưa hết hạn nộp -> Vẫn hiển thị là Đủ (hoặc chờ học viên làm)
+                            // Hoặc: Có bài tập được giao nhưng chưa hết hạn
+                            // Hoặc: Có bài tập quá hạn nhưng học viên đã nộp hết
                             $status = 'Đủ';
                         }
                     }

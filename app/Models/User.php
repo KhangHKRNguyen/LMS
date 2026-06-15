@@ -32,7 +32,6 @@ class User extends Authenticatable
 
     protected $hidden = [
         'password',
-        'remember_token',
     ];
 
     protected function casts(): array
@@ -108,5 +107,10 @@ class User extends Authenticatable
     public function classes(): BelongsToMany
     {
         return $this->belongsToMany(CourseClass::class, 'class_user', 'user_id', 'course_class_id')->withTimestamps();
+    }
+    
+    public function learningResults()
+    {
+        return $this->hasMany(\App\Models\LearningResult::class, 'user_id');
     }
 }

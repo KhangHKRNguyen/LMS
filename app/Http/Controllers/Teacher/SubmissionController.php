@@ -8,10 +8,12 @@ use App\Models\CourseClass;
 use App\Models\AssignmentDistribution;
 use App\Models\Submission;
 use App\Models\Question;
+use App\Models\Feedback;
 use App\Services\IeltsScoreService;
 use Illuminate\Support\Facades\DB;
 use App\Models\LearningResult;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth; 
 
 class SubmissionController extends Controller
 {
@@ -170,5 +172,35 @@ class SubmissionController extends Controller
 
         return redirect()->route('teacher.submissions.index', [$class->id, $submission->assignment_distribution_id])
             ->with('success', 'Đã lưu điểm chấm bài và cập nhật IELTS Band Score thành công!');
+    }
+
+    public function feedbackChat(CourseClass $class, Submission $submission)
+    {
+        $submission->load('user', 'assignmentDistribution.assignment');
+        $distribution = $submission->assignmentDistribution;
+
+        // Lấy lịch sử chat xếp theo thứ tự thời gian tăng dần
+        $chats = Feedback::where('submission_id', $submission->id)
+            ->with('user')
+            ->orderBy('created_at', 'asc')
+            ->get();
+
+        return view('teacher.submissions.feedback', compact('class', 'distribution', 'submission', 'chats'));
+    }
+
+    // Xử lý gửi tin nhắn từ Giáo viên
+    public function sendFeedback(Request $request, CourseClass $class, Submission $submission)
+    {
+        $request->validate([
+            'content' => 'required|string|max:1000',
+        ]);
+
+        Feedback::create([
+            'content' => $request->input('content'),
+            'user_id' => Auth::id(),
+            'submission_id' => $submission->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Gửi phản hồi thành công!');
     }
 }

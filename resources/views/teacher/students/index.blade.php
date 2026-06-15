@@ -21,8 +21,8 @@
     
     <div class="d-flex align-items-center gap-3">
         {{-- 4. HIỂN THỊ DANH SÁCH CÁC BUỔI HỌC TỪ DATABASE --}}
-        <select class="form-select form-select-sm border-danger fw-semibold text-dark" style="width: 160px;">
-            <option value="">-- Chọn buổi học --</option>
+        <select id="session-filter" class="form-select form-select-sm border-danger fw-semibold text-dark" style="width: 160px;">
+            <option value="all">-- Tất cả các buổi --</option> {{-- Đổi value rỗng thành "all" để xem toàn bộ --}}
             @foreach($class->lessonSessions as $index => $session)
                 <option value="{{ $session->id }}">
                     Buổi {{ $index + 1 }} ({{ date('d/m/Y', strtotime($session->lesson_date)) }})
@@ -43,7 +43,7 @@
                 
                 {{-- LẶP ĐỘNG TIÊU ĐỀ CÁC BUỔI HỌC CÓ TRONG DATABASE --}}
                 @foreach($class->lessonSessions as $index => $session)
-                    <th>Buổi {{ $index + 1 }}</th>
+                    <th class="session-col" data-session-id="{{ $session->id }}">Buổi {{ $index + 1 }}</th>
                 @endforeach
                 
                 <th>Tổng thiếu bài</th>
@@ -62,7 +62,8 @@
                     @php
                         $status = $student->session_statuses[$session->id] ?? 'Chưa đến';
                     @endphp
-                    <td class="text-center align-middle">
+                    {{-- Thêm class "session-col" và thuộc tính data-session-id vào đây --}}
+                    <td class="text-center align-middle session-col" data-session-id="{{ $session->id }}">
                         @if($status === 'Thiếu')
                             <span class="badge px-3 py-1 text-danger bg-danger-subtle border border-danger" style="background-color:#FFCCCC !important; color: #990000 !important;">
                                 Thiếu
@@ -92,4 +93,29 @@
 <div class="d-flex justify-content-center mt-4">
     {{ $students->links() }}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const sessionFilter = document.getElementById('session-filter');
+    const sessionColumns = document.querySelectorAll('.session-col');
+
+    sessionFilter.addEventListener('change', function () {
+        const selectedSessionId = this.value;
+
+        sessionColumns.forEach(col => {
+            // Nếu chọn "Tất cả" (all) thì hiện lại toàn bộ các buổi
+            if (selectedSessionId === 'all') {
+                col.style.display = ''; 
+            } else {
+                // Nếu trùng với ID được chọn thì hiện, không trùng thì ẩn đi
+                if (col.getAttribute('data-session-id') === selectedSessionId) {
+                    col.style.display = '';
+                } else {
+                    col.style.display = 'none';
+                }
+            }
+        });
+    });
+});
+</script>
 @endsection

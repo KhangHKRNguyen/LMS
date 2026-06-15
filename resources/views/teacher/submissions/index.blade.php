@@ -40,6 +40,11 @@
                 </thead>
                 <tbody class="fs-7">
                     @forelse($submissions as $index => $sub)
+                        @php
+                            $hasStudentFeedback = $sub->feedbacks->contains(function($feedback) {
+                                return $feedback->user->role === 'student';
+                            });
+                        @endphp
                         <tr>
                             <td class="ps-4 fw-medium text-secondary">{{ $index + 1 }}</td>
                             <td class="text-center">{{ $sub->user->id }}</td>
@@ -63,10 +68,21 @@
                                 {{ $sub->total_grade !== null ? number_format($sub->total_grade, 1) : '—' }}
                             </td>
                             <td class="pe-4 text-end">
-                                <a href="{{ route('teacher.submissions.grade', [$class->id, $sub->id]) }}" 
-                                   class="btn btn-sm {{ $sub->status === 'graded' ? 'btn-outline-secondary' : 'btn-danger shadow-sm' }} fw-bold px-3">
-                                    Chấm bài
-                                </a>
+                                <div class="d-flex justify-content-end gap-1">
+                                    {{-- NÚT PHẢN HỒI MỌC RA KHI CÓ TIN NHẮN HỌC VIÊN CHAT --}}
+                                    @if($hasStudentFeedback)
+                                        <a href="{{ route('teacher.submissions.feedback', [$class->id, $sub->id]) }}" 
+                                        class="btn btn-sm btn-warning fw-bold px-2 position-relative shadow-sm text-dark">
+                                            Phản hồi
+                                            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                                        </a>
+                                    @endif
+
+                                    <a href="{{ route('teacher.submissions.grade', [$class->id, $sub->id]) }}" 
+                                    class="btn btn-sm {{ $sub->status === 'graded' ? 'btn-outline-secondary' : 'btn-danger shadow-sm' }} fw-bold px-3">
+                                        Chấm bài
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                     @empty

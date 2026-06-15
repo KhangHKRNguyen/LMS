@@ -1,8 +1,8 @@
-@extends('layouts.taclassroom')
+@extends('layouts.classroom')
 
-@section('title', 'Tổng kết lớp học - TA')
+@section('title', 'Tổng kết lớp học - Giảng viên')
 
-@section('taclassroom_content')
+@section('classroom_content')
 <style>
     .table-arena th { background-color: #800000 !important; color: white !important; text-align: center; vertical-align: middle; font-size: 13px; border: 1px solid #dee2e6; }
     .table-arena td { vertical-align: middle; text-align: center; border: 1px solid #dee2e6; font-size: 13.5px; }
@@ -19,33 +19,15 @@
 </div>
 
 <div class="row g-3 mb-4 align-items-center">
-    <div class="col-12 col-md-4">
+    <div class="col-12">
         <div class="card border-0 shadow-sm stat-card bg-white">
-            <div class="card-body p-3 d-flex align-items-center justify-content-between">
+            <div class="card-body p-3 d-flex align-items-center justify-content-start">
                 <div>
                     <span class="text-muted d-block fs-7 fw-semibold text-uppercase">Tổng số học viên</span>
                     <h3 class="fw-bold m-0 text-dark mt-1">{{ $students->count() }}</h3>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="col-12 col-md-8 text-end d-flex justify-content-end gap-2 flex-wrap">
-        <button type="button" onclick="scrollToDashboard()" class="btn btn-outline-dark fw-bold px-3 py-2 shadow-sm d-inline-flex align-items-center gap-2">
-            Xem Dashboard Lớp Học
-        </button>
-
-        @if($isAllApproved)
-            <button class="btn btn-success fw-bold px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" disabled>
-                ĐÃ PHÊ DUYỆT TỔNG KẾT
-            </button>
-        @else
-            <form action="{{ route('ta.classes.summary.approve', $class->id) }}" method="POST" class="d-inline">
-                @csrf
-                <button type="submit" class="btn text-white fw-bold px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" style="background-color: #DF8A14;" onclick="return confirm('Bạn có chắc chắn muốn phê duyệt kết quả tổng kết cho toàn bộ học viên lớp này không?')">
-                    PHÊ DUYỆT KẾT QUẢ
-                </button>
-            </form>
-        @endif
     </div>
 </div>
 
@@ -63,14 +45,13 @@
                         <th>Tổng buổi nghỉ</th>
                         <th>Tổng thiếu bài</th>
                         <th>Trạng thái đầu ra</th>
-                        <th>Trạng thái duyệt</th>
                     </tr>
                 </thead>
                 <tbody>
                     @forelse($students as $index => $student)
                         <tr>
                             <td>{{ $index + 1 }}</td>
-                            <td class="fw-bold text-secondary">HV-{{ str_pad($student->id, 4, '0', STR_PAD_LEFT) }}</td>
+                            <td class="fw-bold text-secondary">{{ $student->id }}</td>
                             <td class="text-start ps-3 fw-semibold text-dark">{{ $student->name }}</td>
                             <td class="fw-bold text-primary">{{ $student->midterm_grade ?? '—' }}</td>
                             <td class="fw-bold text-primary">{{ $student->final_grade ?? '—' }}</td>
@@ -91,17 +72,10 @@
                                     <span class="badge bg-danger-subtle text-danger px-3 py-2 border border-danger-subtle rounded-pill fw-bold">Không đạt</span>
                                 @endif
                             </td>
-                            <td>
-                                @if($student->approval_status === 'Đã duyệt')
-                                    <span class="text-success fw-semibold">Đã duyệt</span>
-                                @else
-                                    <span class="text-warning fw-semibold">Chờ duyệt</span>
-                                @endif
-                            </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="9" class="p-5 text-muted text-center">
+                            <td colspan="8" class="p-5 text-muted text-center">
                                 Không tìm thấy dữ liệu học viên trong danh sách tổng kết lớp này.
                             </td>
                         </tr>

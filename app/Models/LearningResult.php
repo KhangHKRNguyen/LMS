@@ -22,8 +22,7 @@ class LearningResult extends Model
         'approval_status',
     ];
 
-    // Thiết lập các mối quan hệ (Optional - phục vụ làm thống kê/summary sau này)
-    public function user()
+    public function student()
     {
         return $this->belongsTo(User::class, 'user_id');
     }

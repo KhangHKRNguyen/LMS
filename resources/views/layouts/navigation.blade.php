@@ -23,6 +23,13 @@
                 <x-dropdown align="right" width="48">
                     <x-slot name="trigger">
                         <button class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-gray-500 bg-white hover:text-gray-700 focus:outline-none transition ease-in-out duration-150">
+                            @if(Auth::user()->avatar)
+                                <img src="{{ asset('storage/' . Auth::user()->avatar) }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover me-2 border-2" style="border-color: #990000;">
+                            @else
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white text-xs me-2" style="background-color: #990000;">
+                                    {{ strtoupper(substr(Auth::user()->name, 0, 1)) }}
+                                </div>
+                            @endif
                             <div>{{ Auth::user()->name }}</div>
 
                             <div class="ms-1">
@@ -35,7 +42,7 @@
 
                     <x-slot name="content">
                         <x-dropdown-link :href="route('profile.edit')">
-                            {{ __('Profile') }}
+                            {{ __('Hồ sơ cá nhân') }}
                         </x-dropdown-link>
 
                         <!-- Authentication -->
@@ -45,7 +52,7 @@
                             <x-dropdown-link :href="route('logout')"
                                     onclick="event.preventDefault();
                                                 this.closest('form').submit();">
-                                {{ __('Log Out') }}
+                                {{ __('Đăng xuất') }}
                             </x-dropdown-link>
                         </form>
                     </x-slot>
@@ -81,7 +88,7 @@
 
             <div class="mt-3 space-y-1">
                 <x-responsive-nav-link :href="route('profile.edit')">
-                    {{ __('Profile') }}
+                    {{ __('Hồ sơ cá nhân') }}
                 </x-responsive-nav-link>
 
                 <!-- Authentication -->
@@ -91,7 +98,7 @@
                     <x-responsive-nav-link :href="route('logout')"
                             onclick="event.preventDefault();
                                         this.closest('form').submit();">
-                        {{ __('Log Out') }}
+                        {{ __('Đăng xuất') }}
                     </x-responsive-nav-link>
                 </form>
             </div>
