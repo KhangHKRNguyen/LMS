@@ -62,7 +62,7 @@
                                         <optgroup label="Lớp: {{ $class->class_name }}">
                                             @foreach($class->lessonSessions as $session)
                                                 <option value="{{ $session->id }}" {{ old('lesson_session_id') == $session->id ? 'selected' : '' }}>
-                                                    Buổi học ngày: {{ \Carbon\Carbon::parse($session->session_date)->format('d/m/Y') }} (Mã buổi: #{{ $session->id }})
+                                                    Buổi học ngày: {{ \Carbon\Carbon::parse($session->lesson_date)->format('d/m/Y') }} (Mã buổi: #{{ $session->id }})
                                                 </option>
                                             @endforeach
                                         </optgroup>
@@ -103,14 +103,18 @@
                             @error('due_time') <div class="invalid-feedback">{{ $message }}</div> @enderror
                         </div>
 
-                        <div class="col-12">
-                            <label class="form-label fw-semibold text-secondary">Số lần làm bài tối đa của mỗi học viên</label>
-                            <select class="form-select" name="max_attempts" style="height: 44px; border-radius: 6px;">
-                                <option value="1" {{ old('max_attempts') == '1' ? 'selected' : '' }}>Chỉ làm bài 1 lần duy nhất</option>
-                                <option value="2" {{ old('max_attempts') == '2' ? 'selected' : '' }}>Tối đa 2 lần</option>
-                                <option value="3" {{ old('max_attempts') == '3' ? 'selected' : '' }}>Tối đa 3 lần</option>
-                                <option value="0" {{ old('max_attempts') == '0' ? 'selected' : '' }}>Không giới hạn số lần làm bài</option>
-                            </select>
+                        <div class="mb-3">
+                            <label for="max_attempts" class="form-label fw-bold">Giới hạn số lần làm lại bài</label>
+                            <input type="number" 
+                                name="max_attempts" 
+                                id="max_attempts" 
+                                class="form-control" 
+                                value="1" 
+                                min="0" {{-- Sửa từ min="1" thành min="0" --}}
+                                required>
+                            <small class="text-muted d-block mt-1">
+                                <i class="bi bi-info-circle"></i> Nhập <strong>0</strong> nếu muốn cho phép học viên làm bài <strong>không giới hạn số lần</strong>.
+                            </small>
                         </div>
                     </div>
 

@@ -26,7 +26,7 @@ class ExamController extends Controller
     public function create()
     {
         $types = AssignmentType::all();
-        $skills = Skill::all(); // Lấy danh sách Nghe, Nói, Đọc, Viết để giáo viên cấu hình từng câu hỏi
+        $skills = Skill::all();
         return view('teacher.exams.create', compact('types', 'skills'));
     }
 
@@ -35,12 +35,11 @@ class ExamController extends Controller
         $request->validate([
             'title' => 'required|string|max:255',
             'assignment_type_id' => 'required|exists:assignment_types,id',
-            'file_path' => 'nullable|file|mimes:pdf,doc,docx,zip|max:10240',
+            'file_path' => 'nullable|file|mimes:mp3,wav,m4a,wma,aac|max:40960',
             'questions' => 'required|array|min:1',
         ]);
 
         DB::transaction(function () use ($request) {
-            // 1. Tạo đề thi gốc
             $exam = Assignment::create([
                 'title' => $request->title,
                 'description' => $request->description,
@@ -53,7 +52,6 @@ class ExamController extends Controller
                 $exam->save();
             }
 
-            // 2. Lưu danh sách câu hỏi lồng nhau
             foreach ($request->input('questions', []) as $index => $qData) {
                 $question = $exam->questions()->create([
                     'question_number' => $qData['question_number'] ?? ($index + 1),
@@ -64,13 +62,14 @@ class ExamController extends Controller
                     'skill_id' => $qData['skill_id'],
                 ]);
 
-                // Xử lý các nhánh con phụ thuộc dạng câu hỏi
                 if ($qData['question_type'] === 'trac_nghiem' && isset($qData['options'])) {
+                    $correctLetter = $qData['correct_option'] ?? null;
+                    
                     foreach ($qData['options'] as $oData) {
                         $question->options()->create([
-                            'option_letter' => $oData['option_letter'],
+                            'option_letter'  => $oData['option_letter'],
                             'option_content' => $oData['option_content'],
-                            'is_correct' => isset($oData['is_correct']) && $oData['is_correct'] == '1',
+                            'is_correct'     => ($oData['option_letter'] === $correctLetter), 
                         ]);
                     }
                 } elseif ($qData['question_type'] === 'dien_tu' && isset($qData['keywords'])) {
@@ -89,7 +88,6 @@ class ExamController extends Controller
 
     public function show($id)
     {
-        // Xem chi tiết cấu trúc toàn bộ đề và đáp án chuẩn của từng câu hỏi
         $exam = Assignment::with(['assignmentType', 'questions.skill', 'questions.options', 'questions.keywords'])->findOrFail($id);
         return view('teacher.exams.show', compact('exam'));
     }
@@ -127,8 +125,7 @@ class ExamController extends Controller
                 $exam->save();
             }
 
-            // Giải pháp tối ưu nhất cho cấu trúc lồng nhau phức tạp trên giao diện Blade cũ:
-            // Xóa sạch các câu hỏi cũ (Hệ thống tự động cascade xóa options/keywords) và ghi đè lại loạt mới
+            // Xóa câu hỏi cũ để ghi đè danh sách đồng bộ mới
             $exam->questions()->delete();
 
             foreach ($request->input('questions', []) as $index => $qData) {
@@ -142,11 +139,13 @@ class ExamController extends Controller
                 ]);
 
                 if ($qData['question_type'] === 'trac_nghiem' && isset($qData['options'])) {
+                    $correctLetter = $qData['correct_option'] ?? null;
+
                     foreach ($qData['options'] as $oData) {
                         $question->options()->create([
-                            'option_letter' => $oData['option_letter'],
+                            'option_letter'  => $oData['option_letter'],
                             'option_content' => $oData['option_content'],
-                            'is_correct' => isset($oData['is_correct']) && $oData['is_correct'] == '1',
+                            'is_correct'     => ($oData['option_letter'] === $correctLetter),
                         ]);
                     }
                 } elseif ($qData['question_type'] === 'dien_tu' && isset($qData['keywords'])) {

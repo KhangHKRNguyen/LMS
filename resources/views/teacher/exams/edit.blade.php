@@ -27,8 +27,9 @@
                         </select>
                     </div>
                     <div class="col-md-12">
-                        <label class="form-label fw-semibold">Cập nhật file đề bài cũ (Chọn file mới nếu muốn thay thế)</label>
-                        <input type="file" class="form-control" name="file_path">
+                        <label class="form-label fw-semibold">Tệp âm thanh đính kèm (Dành cho bài Listening)</label>
+                        <input type="file" class="form-control" name="file_path" accept="audio/*">
+                        <small class="text-muted d-block mt-1">Hệ thống chỉ chấp nhận định dạng âm thanh (.mp3, .wav, .m4a, .wma) phục vụ làm bài thi nghe.</small>
                         @if($exam->file_path)
                             <small class="text-success d-block mt-1">Đề thi hiện đang có file đính kèm lưu trên hệ thống.</small>
                         @endif
@@ -42,7 +43,7 @@
         </div>
 
         <h5 class="fw-bold mb-3 text-dark">DANH SÁCH CÂU HỎI HIỆN TẠI</h5>
-        <div class="alert alert-warning py-2 small shadow-sm"><i class="bi bi-info-circle-fill"></i> Mẹo: Để chỉnh sửa cấu trúc đề thi một cách đồng bộ và tránh phân mảnh, hệ thống sẽ lưu lại toàn bộ các câu hỏi bên dưới thành một phiên bản đề thi mới nhất.</div>
+        <div class="alert alert-warning py-2 small shadow-sm"><i class="bi bi-info-circle-fill"></i> Mẹo: Toàn bộ cấu trúc câu hỏi sẽ được ghi đè đồng bộ phiên bản mới nhất.</div>
 
         <div id="questions-container">
             @foreach($exam->questions as $index => $question)
@@ -73,7 +74,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Điểm số</label>
-                                <input type="number" step="0.25" name="questions[{{ $qIndex }}][points]" class="form-control form-control-sm" value="{{ $question->points }}" required>
+                                <input type="number" step="0.1" name="questions[{{ $qIndex }}][points]" class="form-control form-control-sm" value="{{ $question->points }}" required>
                             </div>
                             <div class="col-md-12">
                                 <label class="form-label small fw-bold">Nội dung câu hỏi / Yêu cầu đề</label>
@@ -85,17 +86,13 @@
                             @if($question->question_type === 'trac_nghiem')
                                 <div class="p-3 bg-light border rounded">
                                     <div class="row g-2">
-                                        @foreach(['A', 'B', 'C', 'D'] as $letter)
-                                            @php 
-                                                $opt = $question->options->where('option_letter', $letter)->first(); 
-                                            @endphp
+                                        @foreach($question->options->sortBy('option_letter') as $oKey => $opt)
                                             <div class="col-md-6 d-flex align-items-center gap-2">
-                                                <span class="fw-bold">{{ $letter }}.</span>
-                                                <input type="hidden" name="questions[{{ $qIndex }}][options][{{ $letter }}][option_letter]" value="{{ $letter }}">
-                                                <input type="text" name="questions[{{ $qIndex }}][options][{{ $letter }}][option_content]" class="form-control form-control-sm" value="{{ $opt->option_content ?? '' }}" required>
+                                                <span class="fw-bold">{{ $opt->option_letter }}.</span>
+                                                <input type="hidden" name="questions[{{ $qIndex }}][options][{{ $oKey }}][option_letter]" value="{{ $opt->option_letter }}">
+                                                <input type="text" name="questions[{{ $qIndex }}][options][{{ $oKey }}][option_content]" class="form-control form-control-sm" value="{{ $opt->option_content }}" required>
                                                 <div class="form-check m-0">
-                                                    <input class="form-check-input" type="radio" name="questions[{{ $qIndex }}][options_correct]" value="{{ $letter }}" {{ isset($opt) && $opt->is_correct ? 'checked' : '' }} onchange="updateCorrectRadio({{ $qIndex }}, '{{ $letter }}')">
-                                                    <input type="hidden" id="correct-input-{{ $qIndex }}-{{ $letter }}" name="questions[{{ $qIndex }}][options][{{ $letter }}][is_correct]" value="{{ isset($opt) && $opt->is_correct ? '1' : '0' }}">
+                                                    <input class="form-check-input" type="radio" name="questions[{{ $qIndex }}][correct_option]" value="{{ $opt->option_letter }}" {{ $opt->is_correct ? 'checked' : '' }} required>
                                                     <label class="form-check-label small">Đúng</label>
                                                 </div>
                                             </div>
@@ -133,12 +130,4 @@
         </div>
     </form>
 </div>
-
-<script>
-function updateCorrectRadio(id, correctLetter) {
-    ['A', 'B', 'C', 'D'].forEach(letter => {
-        document.getElementById(`correct-input-${id}-${letter}`).value = (letter === correctLetter) ? "1" : "0";
-    });
-}
-</script>
 @endsection

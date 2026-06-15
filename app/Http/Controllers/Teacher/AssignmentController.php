@@ -17,17 +17,19 @@ use Illuminate\Support\Str;
 
 class AssignmentController extends Controller
 {
-    public function index($classId)
+   public function index($classId)
     {
-        // Tìm lớp học cụ thể dựa vào ID trên URL, nạp kèm bài tập và đếm sĩ số học viên
-        $class = CourseClass::with(['assignments' => function($q) {
-            $q->with('exam');
-        }])
-        ->withCount('students')
-        ->findOrFail($classId);
+        // 1. Tìm lớp học và đếm sĩ số học viên
+        $class = CourseClass::withCount('students')->findOrFail($classId);
 
-        // Trả về view quản lý bài tập
-        return view('teacher.assignments.index', compact('class'));
+        // 2. BỔ SUNG QUYẾT ĐỊNH: Lấy chính xác các đợt giao bài (distributions) thuộc về lớp học này
+        // Lọc thông qua buổi học (lessonSession) thuộc classId hiện tại
+        $distributions = AssignmentDistribution::whereHas('lessonSession', function($q) use ($classId) {
+            $q->where('course_class_id', $classId);
+        })->with(['assignment', 'lessonSession'])->latest()->get();
+
+        // 3. Truyền cả biến $class và $distributions sang view
+        return view('teacher.assignments.index', compact('class', 'distributions'));
     }
 
     public function create()
@@ -255,7 +257,7 @@ class AssignmentController extends Controller
             'duration_minutes'  => ['required', 'integer', 'min:1'],
             'start_time'        => ['required', 'date'],
             'due_time'          => ['required', 'date', 'after:start_time'],
-            'max_attempts'      => ['required', 'integer', 'min:1'],
+            'max_attempts'      => ['required', 'integer', 'min:0'],
         ], [
             'lesson_session_id.required' => 'Vui lòng chọn một buổi học cụ thể để giao bài (Bắt buộc).',
             'lesson_session_id.exists'   => 'Buổi học được chọn không hợp lệ.',
@@ -298,19 +300,27 @@ class AssignmentController extends Controller
 
     public function globalIndex(Request $request)
     {
-        // Lấy danh sách phối bài như cũ
-        $distributions = AssignmentDistribution::with(['assignment', 'lessonSession.courseClass'])
-            ->where('user_id', Auth::id())
-            ->latest()
-            ->get();
+        // 1. Tạo query gốc lấy phối bài của giáo viên hiện tại
+        $query = AssignmentDistribution::with(['assignment', 'lessonSession.courseClass'])
+            ->where('user_id', Auth::id());
 
-        // BỔ SUNG: Tìm thông tin lớp nếu có class_id truyền lên từ sidebar
+        // 2. BỔ SUNG LOGIC: Nếu có class_id truyền lên từ sidebar, lọc chỉ lấy bài tập của riêng lớp đó
         $class = null;
         if ($request->has('class_id')) {
-            $class = \App\Models\CourseClass::find($request->query('class_id'));
+            $classId = $request->query('class_id');
+            $class = \App\Models\CourseClass::find($classId);
+            
+            if ($class) {
+                $query->whereHas('lessonSession', function ($q) use ($classId) {
+                    $q->where('course_class_id', $classId);
+                });
+            }
         }
 
-        // Truyền cả $distributions và $class sang view
+        // 3. Sắp xếp bài tập mới nhất lên đầu
+        $distributions = $query->latest()->get();
+
+        // Truyền cả $distributions và $class sang giao diện view
         return view('teacher.assignments.global_index', compact('distributions', 'class'));
     }
 }

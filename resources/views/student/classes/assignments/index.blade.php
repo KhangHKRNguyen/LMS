@@ -1,56 +1,74 @@
-@extends('student.classes.layout')
+@extends('layouts.student_classroom')
 
 @section('title', 'Bài tập lớp học')
 
 @section('class_content')
 <div class="d-flex justify-content-between align-items-center mb-3">
-    <h6 class="fw-bold text-dark m-0 text-uppercase">
-        <i class="bi bi-list-task text-danger"></i> Danh sách bài tập
+    <h6 class="fw-bold text-uppercase m-0" style="color: #990000;">
+        Danh sách bài tập được giao
     </h6>
-    <span class="text-muted fs-7">Tổng số: <strong>{{ $assignments->count() }} bài tập</strong></span>
+    <span class="badge bg-secondary px-3 py-2">Tổng số: {{ $distributions->count() }} bài</span>
 </div>
 
-<div class="table-responsive shadow-sm" style="border-radius: 8px;">
-    <table class="table-arena m-0">
-        <thead>
+<div class="table-responsive shadow-sm rounded bg-white">
+    <table class="table table-hover table-bordered m-0 text-center align-middle" style="font-size: 14px;">
+        <thead class="text-white text-nowrap" style="background-color: #990000;">
             <tr>
                 <th style="width: 50px;">STT</th>
-                <th>Mã Bài</th>
-                <th style="text-align: left;">Tiêu Đề</th>
-                <th>Hạn Nộp</th>
-                <th>Loại</th>
-                <th>Trạng Thái</th>
-                <th>Thao tác</th>
+                <th>Buổi học</th>
+                <th>Tên bài tập</th>
+                <th>Loại bài tập</th>
+                <th>Thời gian làm</th>
+                <th>Thời gian mở</th>
+                <th>Thời gian đóng</th>
+                <th>Số lần làm bài</th>
+                <th>Hành động</th>
             </tr>
         </thead>
         <tbody>
-            @foreach($assignments as $index => $item)
-            <tr>
-                <td>{{ $index + 1 }}</td>
-                <td class="fw-bold text-dark">#{{ $item->id }}</td>
-                <td style="text-align: left;" class="fw-medium">{{ $item->title }}</td>
-                <td class="text-secondary fs-7">{{ $item->due_time->format('H:i - d/m/Y') }}</td>
-                <td>{{ $item->typeLabel() }}</td>
-                <td>
-                    @php $sub = $item->submissions->first(); @endphp
-                    @if($sub)
-                        <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 fs-8">
-                            {{ $sub->status }}
+            @forelse($distributions as $index => $dist)
+                <tr>
+                    <td>{{ $index + 1 }}</td>
+                    <td>
+                        <span class="fw-semibold text-secondary">
+                            Buổi ngày {{ $dist->lessonSession ? \Carbon\Carbon::parse($dist->lessonSession->lesson_date)->format('d/m/Y') : '---' }}
                         </span>
-                    @else
-                        <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 fs-8">
-                            Chưa nộp
+                    </td>
+                    <td class="text-start fw-bold text-dark">{{ $dist->assignment->title }}</td>
+                    <td>
+                        <span class="badge bg-light text-dark border">
+                            {{ $dist->assignment->assignmentType->name ?? 'Chưa phân loại' }}
                         </span>
-                    @endif
-                </td>
-                <td>
-                    <a href="{{ route('student.assignments.show', $item->id) }}" 
-                       class="btn btn-sm btn-primary px-3 fw-bold fs-8">
-                       {{ $sub ? 'Xem bài' : 'Làm bài' }}
-                    </a>
-                </td>
-            </tr>
-            @endforeach
+                    </td>
+                    <td>{{ $dist->duration_minutes ? $dist->duration_minutes . ' phút' : 'Không giới hạn' }}</td>
+                    <td class="fs-7 text-secondary">{{ $dist->open_time ? $dist->open_time->format('H:i d/m/Y') : '---' }}</td>
+                    <td class="fs-7 text-secondary">{{ $dist->close_time ? $dist->close_time->format('H:i d/m/Y') : '---' }}</td>
+                    <td>
+                        @php
+                            $submissionCount = $dist->submissions->count();
+                            $maxAttempts = $dist->max_attempts;
+                        @endphp
+                        @if($maxAttempts)
+                            <span class="badge bg-info">{{ $submissionCount }}/{{ $maxAttempts }}</span>
+                        @else
+                            <span class="badge bg-secondary">{{ $submissionCount }}</span>
+                        @endif
+                    </td>
+                    <td>
+                        <a href="{{ route('student.classes.assignments.detail', ['class' => $class->id, 'distribution' => $dist->id]) }}" 
+                           class="btn btn-sm btn-outline-dark fw-bold px-3">
+                             Chi tiết
+                        </a>
+                    </td>
+                </tr>
+            @empty
+                <tr>
+                    <td colspan="8" class="text-muted py-5">
+                        <i class="bi bi-inbox fs-3 d-block mb-2 text-secondary"></i>
+                        Hiện tại chưa có bài tập nào được giao cho lớp học này.
+                    </td>
+                </tr>
+            @endforelse
         </tbody>
     </table>
 </div>

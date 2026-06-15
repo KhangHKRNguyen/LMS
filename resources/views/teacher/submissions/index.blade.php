@@ -1,86 +1,84 @@
 @extends('layouts.classroom')
 
-@section('title', 'Quản lý bài nộp - Giảng viên')
-
-{{-- Kích hoạt trạng thái Active cho menu Bài Nộp --}}
-@section('menu_bai_nop_class', 'btn w-100 text-start py-2 fw-bold text-white')
-@section('menu_bai_nop_style', 'background-color: #800000;')
+@section('title', 'Danh sách bài nộp')
 
 @section('classroom_content')
-{{-- CHỂ ĐỘ VIEW 1: TỔNG QUAN CÁC BÀI TẬP ĐÃ GIAO --}}
-<div id="exerciseOverviewSection" class="mb-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold m-0"><i class="bi bi-arrow-left me-2"></i>LỚP HỌC - U206 (Danh mục bài tập)</h5>
-    </div>
-    <div class="row">
-        <div class="col-md-2 border rounded p-2 bg-light-subtle">
-            <select class="form-select form-select-sm mb-2"><option>Buổi học</option></select>
-            <div class="list-group list-group-flush small fw-bold">
-                <button class="list-group-item list-group-item-action text-danger active-session border-start border-3 border-danger">Buổi 1</button>
-                <button class="list-group-item list-group-item-action">Buổi 2</button>
-                <button class="list-group-item list-group-item-action">Buổi 3</button>
-                <button class="list-group-item list-group-item-action">Buổi 16</button>
-            </div>
+<div class="container-fluid p-0">
+    
+    {{-- Thanh điều hướng & Số lượng tổng quát --}}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h4 class="fw-bold text-dark mb-1">Quản lý bài nộp học viên</h4>
+            <p class="text-muted mb-0 fs-7">
+                Bài tập: <strong class="text-dark">{{ $distribution->assignment->title }}</strong> 
+                | Buổi học: <strong class="text-primary">Ngày {{ \Carbon\Carbon::parse($distribution->lessonSession->lesson_date)->format('d/m/Y') }}</strong>
+            </p>
         </div>
-        <div class="col-md-10">
-            <table class="table table-bordered text-center align-middle small">
-                <thead style="background-color: #800000; color: white;">
+        
+        {{-- Khối hiển thị Tổng số bài nộp phía trên bên phải --}}
+        <div class="bg-white border rounded shadow-sm px-4 py-2 text-center">
+            <small class="text-uppercase text-muted fw-bold d-block fs-8" style="letter-spacing: 0.5px;">Tổng số bài nộp</small>
+            <h3 class="fw-black text-danger m-0 font-monospace">{{ $totalSubmissions }}</h3>
+        </div>
+    </div>
+
+    {{-- Bảng dữ liệu chính --}}
+    <div class="card shadow-sm border-0 bg-white rounded">
+        <div class="card-body p-0">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-red text-uppercase fs-8">
                     <tr>
-                        <th>#</th><th>Buổi</th><th>Bài tập</th><th>Thời gian làm</th><th>Thời gian mở</th><th>Thời gian đóng</th><th>Loại</th><th>Số lần làm lại</th><th>Chờ chấm</th><th>Hành động</th>
+                        <th class="ps-4 py-3" style="width: 70px;">STT</th>
+                        <th>Mã học viên</th>
+                        <th>Tên học viên</th>
+                        <th>Buổi học giao</th>
+                        <th>Thời gian nộp</th>
+                        <th class="text-center">Trạng thái</th>
+                        <th class="text-center">Điểm (Overall)</th>
+                        <th class="pe-4 text-end" style="width: 150px;">Hành động</th>
                     </tr>
                 </thead>
-                <tbody>
-                    <tr>
-                        <td>1</td><td>1</td><td class="fw-semibold">Đề kiểm tra Speaking</td><td>30 phút</td><td>2026-06-03 19:00</td><td>2026-06-10 23:59</td><td>Bài tập về nhà</td><td>2</td><td class="fw-bold text-danger">8</td>
-                        <td><a href="javascript:void(0)" onclick="switchView('detail')" class="text-primary fw-bold text-decoration-none">Xem bài nộp</a></td>
-                    </tr>
+                <tbody class="fs-7">
+                    @forelse($submissions as $index => $sub)
+                        <tr>
+                            <td class="ps-4 fw-medium text-secondary">{{ $index + 1 }}</td>
+                            <td class="text-center">{{ $sub->user->id }}</td>
+                            <td class="fw-bold text-dark">{{ $sub->user->name }}</td>
+                            <td>
+                                <span class="text-secondary">
+                                    {{ \Carbon\Carbon::parse($distribution->lessonSession->lesson_date)->format('d/m/Y') }}
+                                </span>
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ \Carbon\Carbon::parse($sub->submission_time)->format('H:i:s d/m/Y') }}</small>
+                            </td>
+                            <td class="text-center">
+                                @if($sub->status === 'graded')
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 rounded">Đã chấm</span>
+                                @else
+                                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 rounded">Chưa chấm</span>
+                                @endif
+                            </td>
+                            <td class="text-center fw-bold text-primary fs-6">
+                                {{ $sub->total_grade !== null ? number_format($sub->total_grade, 1) : '—' }}
+                            </td>
+                            <td class="pe-4 text-end">
+                                <a href="{{ route('teacher.submissions.grade', [$class->id, $sub->id]) }}" 
+                                   class="btn btn-sm {{ $sub->status === 'graded' ? 'btn-outline-secondary' : 'btn-danger shadow-sm' }} fw-bold px-3">
+                                    Chấm bài
+                                </a>
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-5 fs-6">
+                                Hiện tại chưa có học viên nào nộp bài cho đợt giao bài này.
+                            </td>
+                        </tr>
+                    @endforelse
                 </tbody>
             </table>
         </div>
     </div>
 </div>
-
-{{-- CHẾ ĐỘ VIEW 2: CHI TIẾT BÀI NỘP CỦA HỌC VIÊN --}}
-<div id="submissionDetailSection" style="display: none;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <div>
-            <h5 class="fw-bold m-0"><a href="javascript:void(0)" onclick="switchView('overview')" class="text-decoration-none text-dark"><i class="bi bi-arrow-left me-2"></i>LỚP HỌC - U206</a></h5>
-            <small class="text-muted fw-bold">Tổng số bài nộp: 13</small>
-        </div>
-    </div>
-    <div class="table-responsive border shadow-sm rounded">
-        <table class="table text-center align-middle m-0">
-            <thead style="background-color: #800000; color: white;">
-                <tr>
-                    <th>#</th><th>Mã học viên</th><th class="text-start">Học viên</th><th>Thời gian nộp</th><th>Trạng thái</th><th>Điểm</th><th>Hành động</th>
-                </tr>
-            </thead>
-            <tbody>
-                @for($i=1; $i<=3; $i++)
-                <tr>
-                    <td>{{$i}}</td><td class="text-secondary">101424</td><td class="text-start fw-semibold">Nguyễn Văn A</td><td>2026-06-03 19:00:00</td>
-                    <td><span class="badge bg-success-subtle text-success border border-success px-3 py-1" style="background-color:#E8F5E9 !important;">Đã chấm</span></td>
-                    <td class="fw-bold text-dark">9.0</td>
-                    <td><a href="#" class="btn btn-sm text-primary fw-bold">Chấm bài</a></td>
-                </tr>
-                @endfor
-                @for($i=4; $i<=6; $i++)
-                <tr>
-                    <td>{{$i}}</td><td class="text-secondary">101424</td><td class="text-start fw-semibold">Nguyễn Văn A</td><td>2026-06-03 19:00:00</td>
-                    <td><span class="badge bg-danger-subtle text-danger border border-danger px-3 py-1" style="background-color:#FFEBEE !important;">Chưa chấm</span></td>
-                    <td class="text-muted">—</td>
-                    <td><a href="#" class="btn btn-sm text-primary fw-bold text-decoration-underline">Chấm bài</a></td>
-                </tr>
-                @endfor
-            </tbody>
-        </table>
-    </div>
-</div>
-
-<script>
-    function switchView(view) {
-        document.getElementById('exerciseOverviewSection').style.display = (view === 'overview') ? 'block' : 'none';
-        document.getElementById('submissionDetailSection').style.display = (view === 'detail') ? 'block' : 'none';
-    }
-</script>
 @endsection

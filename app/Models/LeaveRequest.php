@@ -9,9 +9,13 @@ class LeaveRequest extends Model
     protected $table = 'leave_requests';
 
     protected $fillable = [
-        'request_date', 'reason', 'user_id',
-        // Các trường mới refactor ở Bước 3:
-        'lesson_session_id', 'receiver_id', 'file_path', 'status'
+        'reason', 
+        'attachment', 
+        'submitted_at', 
+        'status', 
+        'user_id', 
+        'approver_id', 
+        'lesson_session_id'
     ];
 
     // Đơn xin nghỉ này áp dụng riêng cho buổi học nào
@@ -27,8 +31,8 @@ class LeaveRequest extends Model
     }
 
     // Người duyệt đơn (TA / Admin)
-    public function receiver()
+    public function approver()
     {
-        return $this->belongsTo(User::class, 'receiver_id');
+        return $this->belongsTo(User::class, 'approver_id');
     }
 }
