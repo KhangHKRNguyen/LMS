@@ -16,6 +16,10 @@
             class="sidebar-menu-item {{ Request::routeIs('student.leave_requests.*') ? 'active' : '' }}">
             QUẢN LÝ ĐƠN
         </a>
+        <a href="{{ route('notifications.index') }}"
+            class="sidebar-menu-item {{ Request::routeIs('notifications.*') ? 'active' : '' }}">
+            THÔNG BÁO
+        </a>
     </div>
 </div>
 @endsection

@@ -32,11 +32,14 @@ class ExamController extends Controller
 
     public function store(Request $request)
     {
+        // 1. Bổ sung validation chặt chẽ cho từng phần tử bên trong mảng câu hỏi
         $request->validate([
             'title' => 'required|string|max:255',
             'assignment_type_id' => 'required|exists:assignment_types,id',
             'file_path' => 'nullable|file|mimes:mp3,wav,m4a,wma,aac|max:40960',
             'questions' => 'required|array|min:1',
+            'questions.*.question_type' => 'required|string', // Bắt buộc phải có loại câu hỏi
+            'questions.*.skill_id' => 'required|exists:skills,id',
         ]);
 
         DB::transaction(function () use ($request) {
@@ -52,9 +55,17 @@ class ExamController extends Controller
                 $exam->save();
             }
 
-            foreach ($request->input('questions', []) as $index => $qData) {
+            // Thay vì dùng $index (dễ bị lỗi nếu key từ JS là chuỗi ngẫu nhiên), dùng biến đếm độc lập
+            $qCounter = 1; 
+
+            foreach ($request->input('questions', []) as $qData) {
+                // Kiểm tra phòng vệ: Nếu thiếu loại câu hỏi thì bỏ qua để không gây lỗi 500
+                if (!isset($qData['question_type'])) {
+                    continue;
+                }
+
                 $question = $exam->questions()->create([
-                    'question_number' => $qData['question_number'] ?? ($index + 1),
+                    'question_number' => $qData['question_number'] ?? $qCounter,
                     'question_type' => $qData['question_type'],
                     'question_text' => $qData['question_text'] ?? null,
                     'points' => $qData['points'] ?? 1.00,
@@ -62,6 +73,7 @@ class ExamController extends Controller
                     'skill_id' => $qData['skill_id'],
                 ]);
 
+                // Xử lý câu hỏi trắc nghiệm
                 if ($qData['question_type'] === 'trac_nghiem' && isset($qData['options'])) {
                     $correctLetter = $qData['correct_option'] ?? null;
                     
@@ -72,14 +84,31 @@ class ExamController extends Controller
                             'is_correct'     => ($oData['option_letter'] === $correctLetter), 
                         ]);
                     }
-                } elseif ($qData['question_type'] === 'dien_tu' && isset($qData['keywords'])) {
+                } 
+                // Xử lý câu hỏi điền từ
+                elseif ($qData['question_type'] === 'dien_tu' && isset($qData['keywords'])) {
+                    // Sử dụng biến đếm ô trống độc lập, tránh ghi đè biến $index của vòng lặp ngoài
+                    $kCounter = 1; 
+
                     foreach ($qData['keywords'] as $kData) {
+                        $blankOrder = is_array($kData) ? ($kData['blank_order'] ?? $kCounter) : $kCounter;
+                        $correctKeyword = is_array($kData) ? ($kData['correct_keyword'] ?? '') : $kData;
+
+                        if (trim((string)$correctKeyword) === '') {
+                            $kCounter++;
+                            continue;
+                        }
+
                         $question->keywords()->create([
-                            'blank_order' => $kData['blank_order'],
-                            'correct_keyword' => $kData['correct_keyword'],
+                            'blank_order'     => $blankOrder,
+                            'correct_keyword' => trim((string)$correctKeyword),
                         ]);
+
+                        $kCounter++;
                     }
                 }
+
+                $qCounter++;
             }
         });
 
@@ -102,13 +131,17 @@ class ExamController extends Controller
 
     public function update(Request $request, $id)
     {
-        $exam = Assignment::findOrFail($id);
-        
+        // 1. Áp dụng validation chặt chẽ tương tự hàm store
         $request->validate([
             'title' => 'required|string|max:255',
             'assignment_type_id' => 'required|exists:assignment_types,id',
+            'file_path' => 'nullable|file|mimes:mp3,wav,m4a,wma,aac|max:40960',
             'questions' => 'required|array|min:1',
+            'questions.*.question_type' => 'required|string',
+            'questions.*.skill_id' => 'required|exists:skills,id',
         ]);
+
+        $exam = Assignment::findOrFail($id);
 
         DB::transaction(function () use ($request, $exam) {
             $exam->update([
@@ -125,12 +158,24 @@ class ExamController extends Controller
                 $exam->save();
             }
 
-            // Xóa câu hỏi cũ để ghi đè danh sách đồng bộ mới
-            $exam->questions()->delete();
+            // Xóa an toàn câu hỏi cũ và các mối quan hệ ràng buộc trước khi nạp dữ liệu mới
+            foreach ($exam->questions as $oldQuestion) {
+                $oldQuestion->options()->delete();
+                $oldQuestion->keywords()->delete();
+                $oldQuestion->delete();
+            }
 
-            foreach ($request->input('questions', []) as $index => $qData) {
+            // Khởi tạo biến đếm câu hỏi độc lập
+            $qCounter = 1; 
+
+            foreach ($request->input('questions', []) as $qData) {
+                // Kiểm tra phòng vệ tránh lỗi sập hệ thống (500)
+                if (!isset($qData['question_type'])) {
+                    continue;
+                }
+
                 $question = $exam->questions()->create([
-                    'question_number' => $qData['question_number'] ?? ($index + 1),
+                    'question_number' => $qData['question_number'] ?? $qCounter,
                     'question_type' => $qData['question_type'],
                     'question_text' => $qData['question_text'] ?? null,
                     'points' => $qData['points'] ?? 1.00,
@@ -138,6 +183,7 @@ class ExamController extends Controller
                     'skill_id' => $qData['skill_id'],
                 ]);
 
+                // Xử lý câu hỏi trắc nghiệm
                 if ($qData['question_type'] === 'trac_nghiem' && isset($qData['options'])) {
                     $correctLetter = $qData['correct_option'] ?? null;
 
@@ -148,14 +194,30 @@ class ExamController extends Controller
                             'is_correct'     => ($oData['option_letter'] === $correctLetter),
                         ]);
                     }
-                } elseif ($qData['question_type'] === 'dien_tu' && isset($qData['keywords'])) {
+                } 
+                // Xử lý câu hỏi điền từ (Đã đồng bộ code xử lý an toàn từ hàm store qua)
+                elseif ($qData['question_type'] === 'dien_tu' && isset($qData['keywords'])) {
+                    $kCounter = 1; 
+
                     foreach ($qData['keywords'] as $kData) {
+                        $blankOrder = is_array($kData) ? ($kData['blank_order'] ?? $kCounter) : $kCounter;
+                        $correctKeyword = is_array($kData) ? ($kData['correct_keyword'] ?? '') : $kData;
+
+                        if (trim((string)$correctKeyword) === '') {
+                            $kCounter++;
+                            continue;
+                        }
+
                         $question->keywords()->create([
-                            'blank_order' => $kData['blank_order'],
-                            'correct_keyword' => $kData['correct_keyword'],
+                            'blank_order'     => $blankOrder,
+                            'correct_keyword' => trim((string)$correctKeyword),
                         ]);
+
+                        $kCounter++;
                     }
                 }
+
+                $qCounter++;
             }
         });
 

@@ -25,12 +25,15 @@ class AccountImportService
         return $this->normalizeRows($rows);
     }
 
+    /**
+     * Cập nhật file mẫu không cần cột ID/mã tài khoản
+     */
     public function sampleCsvContent(): string
     {
         return "\xEF\xBB\xBF".implode("\n", [
-            'id,name,email,role', // ĐÃ ĐỔI: user_code -> id tại tiêu đề mẫu file tải về
-            '"M002174","Phạm Trang Nhung","nhunggiangvien@gmail.com","teacher"',
-            '"M008821","Nguyễn Văn B","nguyenvanb@gmail.com","student"',
+            'name,email,role', 
+            '"Phạm Trang Nhung","nhunggiangvien@gmail.com","teacher"',
+            '"Nguyễn Văn B","nguyenvanb@gmail.com","student"',
         ]);
     }
 
@@ -38,9 +41,6 @@ class AccountImportService
     {
         $rows = [];
         $handle = fopen($path, 'rb');
-        if ($handle === false) {
-            throw ValidationException::withMessages(['import_file' => 'Không thể đọc file import.']);
-        }
         while (($row = fgetcsv($handle)) !== false) {
             $rows[] = array_map(fn ($value) => trim((string) $value), $row);
         }
@@ -50,121 +50,164 @@ class AccountImportService
 
     private function readXlsx(string $path): array
     {
-        if (!class_exists(ZipArchive::class) || !function_exists('simplexml_load_string')) {
-            throw ValidationException::withMessages(['import_file' => 'Máy chủ thiếu tiện ích mở rộng mở file XLSX. Vui lòng dùng CSV.']);
-        }
-
-        $zip = new ZipArchive();
-        if ($zip->open($path) !== true) {
-            throw ValidationException::withMessages(['import_file' => 'File XLSX không hợp lệ.']);
-        }
-
-        $sharedStrings = $this->readSharedStrings($zip);
-        $sheetXml = $zip->getFromName('xl/worksheets/sheet1.xml');
-        $zip->close();
-
-        if ($sheetXml === false) {
-            throw ValidationException::withMessages(['import_file' => 'File XLSX phải có sheet đầu tiên chứa dữ liệu.']);
-        }
-
-        $sheet = simplexml_load_string($sheetXml);
         $rows = [];
-        foreach ($sheet->sheetData->row as $row) {
-            $values = [];
-            foreach ($row->c as $cell) {
-                $column = $this->columnIndex((string) $cell['r']);
-                $values[$column] = $this->cellValue($cell, $sharedStrings);
-            }
-            if ($values !== []) {
-                ksort($values);
-                $rows[] = array_values($values);
-            }
-        }
-        return $rows;
-    }
-
-    private function readSharedStrings(ZipArchive $zip): array
-    {
-        $xml = $zip->getFromName('xl/sharedStrings.xml');
-        if ($xml === false) return [];
-        $shared = simplexml_load_string($xml);
-        if ($shared === false) return [];
+        $zip = new ZipArchive();
         
-        $strings = [];
-        foreach ($shared->si as $item) {
-            if (isset($item->t)) { $strings[] = (string) $item->t; continue; }
-            $text = '';
-            foreach ($item->r as $run) { $text .= (string) $run->t; }
-            $strings[] = $text;
-        }
-        return $strings;
-    }
-
-    private function cellValue(\SimpleXMLElement $cell, array $sharedStrings): string
-    {
-        $type = (string) $cell['t'];
-        if ($type === 's') return trim($sharedStrings[(int) $cell->v] ?? '');
-        if ($type === 'inlineStr') return trim((string) $cell->is->t);
-        return trim((string) $cell->v);
-    }
-
-    private function columnIndex(string $cellReference): int
-    {
-        preg_match('/^[A-Z]+/', $cellReference, $matches);
-        $letters = $matches[0] ?? 'A';
-        $index = 0;
-        foreach (str_split($letters) as $letter) {
-            $index = ($index * 26) + (ord($letter) - 64);
-        }
-        return $index - 1;
-    }
-
-    private function normalizeRows(array $rows): array
-    {
-        $rows = array_values(array_filter($rows, fn ($row) => count(array_filter($row, fn ($value) => trim((string) $value) !== '')) > 0));
-
-        if ($rows === []) {
-            throw ValidationException::withMessages(['import_file' => 'File import không có dữ liệu tài khoản.']);
-        }
-
-        $header = array_map(fn ($value) => $this->normalizeHeader((string) $value), $rows[0]);
-        $hasHeader = count(array_intersect($header, ['id', 'user_code', 'ma_tai_khoan', 'ma', 'name', 'ho_ten'])) > 0;
-        $dataRows = $hasHeader ? array_slice($rows, 1) : $rows;
-
-        $accounts = [];
-        foreach ($dataRows as $index => $row) {
-            $source = $hasHeader ? $this->mapHeaderRow($header, $row) : $this->mapFixedRow($row);
-            $line = $hasHeader ? $index + 2 : $index + 1;
-
-            // Kiểm tra trường bắt buộc theo khóa 'id'
-            foreach (['id', 'name', 'email', 'role'] as $field) {
-                if (trim((string) ($source[$field] ?? '')) === '') {
-                    throw ValidationException::withMessages(['import_file' => "Dòng {$line}: Thiếu dữ liệu của trường bắt buộc."]);
+        if ($zip->open($path) === true) {
+            $sharedStrings = [];
+            if ($zip->locateName('xl/sharedStrings.xml') !== false) {
+                $stringsXml = simplexml_load_string($zip->getFromName('xl/sharedStrings.xml'));
+                foreach ($stringsXml->si as $val) {
+                    $sharedStrings[] = (string) $val->t;
                 }
             }
 
-            // Chuẩn hóa quyền (Role)
-            $role = Str::lower(trim((string)$source['role']));
-            
-            // ĐÃ SỬA: Thay đổi từ gọi Hằng số không tồn tại sang chuỗi String chuẩn khớp với Controller
-            $role = match($role) {
-                'giảng viên', 'giang vien', 'teacher' => 'teacher',
-                'trợ lý', 'tro ly', 'ta', 'assistant' => 'ta',
-                'học viên', 'hoc vien', 'student'    => 'student',
-                'admin', 'quản trị'                   => 'admin',
-                default => throw ValidationException::withMessages(['import_file' => "Dòng {$line}: Vai trò '{$role}' không hợp lệ."])
+            if ($zip->locateName('xl/worksheets/sheet1.xml') !== false) {
+                $sheetXml = simplexml_load_string($zip->getFromName('xl/worksheets/sheet1.xml'));
+                foreach ($sheetXml->sheetData->row as $row) {
+                    $rowData = [];
+                    foreach ($row->c as $cell) {
+                        $val = (string) $cell->v;
+                        if (isset($cell['t']) && (string) $cell['t'] === 's') {
+                            $rowData[] = $sharedStrings[(int) $val] ?? '';
+                        } else {
+                            $rowData[] = $val;
+                        }
+                    }
+                    $rows[] = $rowData;
+                }
+            }
+            $zip->close();
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Xử lý chuẩn hóa dữ liệu hàng loạt, kiểm tra trùng lặp và tự động sinh chuỗi ID ngẫu nhiên
+     */
+    private function normalizeRows(array $rows): array
+    {
+        if (empty($rows)) {
+            return [];
+        }
+
+        $processedAccounts = [];
+        $seenEmailsInFile = []; 
+
+        //Lấy số ID lớn nhất hiện tại trong bảng users, nếu bảng trống sẽ xuất phát từ 0
+        $currentMaxId = (int) User::max('id');
+        $nextId = $currentMaxId + 1; // ID tiếp theo sẽ bắt đầu từ đây
+
+        // 1. Lấy dòng đầu tiên để phân tích Tiêu đề (Header)
+        $firstRow = $rows[0];
+        
+        if (count($firstRow) === 1 && (str_contains($firstRow[0], ',') || str_contains($firstRow[0], ';'))) {
+            $delimiter = str_contains($firstRow[0], ';') ? ';' : ',';
+            $firstRow = str_getcsv($firstRow[0], $delimiter);
+        }
+
+        $normalizedFirstRow = array_map([$this, 'normalizeHeader'], $firstRow);
+        $headerKeywords = ['id', 'ma', 'name', 'ten', 'ho_ten', 'email', 'role', 'vai_tro'];
+        
+        $isHeader = false;
+        foreach ($normalizedFirstRow as $cell) {
+            if (in_array($cell, $headerKeywords)) {
+                $isHeader = true;
+                break;
+            }
+        }
+
+        $headerMap = null;
+        $startRowIndex = 0;
+
+        if ($isHeader) {
+            $headerMap = $normalizedFirstRow;
+            $startRowIndex = 1; 
+        }
+
+        // 2. Duyệt qua từng dòng dữ liệu thực tế
+        for ($i = $startRowIndex; $i < count($rows); $i++) {
+            $row = $rows[$i];
+            $lineNumber = $i + 1; 
+
+            if (count($row) === 1 && (str_contains($row[0], ',') || str_contains($row[0], ';'))) {
+                $delimiter = str_contains($row[0], ';') ? ';' : ',';
+                $row = str_getcsv($row[0], $delimiter);
+            }
+
+            if (empty($row) || (count($row) === 1 && trim((string)$row[0]) === '')) {
+                continue;
+            }
+
+            $source = [];
+            if ($headerMap) {
+                foreach ($headerMap as $cellIndex => $key) {
+                    $source[$key] = $row[$cellIndex] ?? '';
+                }
+            } else {
+                if (count($row) >= 4) {
+                    $source['name']  = $row[1] ?? '';
+                    $source['email'] = $row[2] ?? '';
+                    $source['role']  = $row[3] ?? '';
+                } else {
+                    $source['name']  = $row[0] ?? '';
+                    $source['email'] = $row[1] ?? '';
+                    $source['role']  = $row[2] ?? '';
+                }
+            }
+
+            $name    = trim((string)($source['name'] ?? $source['ten'] ?? $source['ho_ten'] ?? ''));
+            $email   = strtolower(trim((string)($source['email'] ?? '')));
+            $roleRaw = strtolower(trim((string)($source['role'] ?? $source['vai_tro'] ?? '')));
+
+            // --- VALIDATION DỮ LIỆU ---
+            if (empty($email)) {
+                throw ValidationException::withMessages([
+                    'import_file' => "Dòng số {$lineNumber}: Email không được để trống.",
+                ]);
+            }
+
+            if (empty($name)) {
+                throw ValidationException::withMessages([
+                    'import_file' => "Dòng số {$lineNumber}: Họ tên không được để trống.",
+                ]);
+            }
+
+            // --- KIỂM TRA TRÙNG LẶP EMAIL ---
+            if (isset($seenEmailsInFile[$email])) {
+                throw ValidationException::withMessages([
+                    'import_file' => "Dòng số {$lineNumber}: Email '{$email}' bị trùng lặp với dòng số {$seenEmailsInFile[$email]} trong file import.",
+                ]);
+            }
+            $seenEmailsInFile[$email] = $lineNumber;
+
+            if (User::where('email', $email)->exists()) {
+                throw ValidationException::withMessages([
+                    'import_file' => "Dòng số {$lineNumber}: Email '{$email}' đã tồn tại trong hệ thống.",
+                ]);
+            }
+
+            // --- CHUẨN HÓA VAI TRÒ (ROLE) ---
+            $role = match ($roleRaw) {
+                'admin', 'quan_tri_vien', 'quản trị viên' => 'admin',
+                'teacher', 'giang_vien', 'giảng viên', 'giáo viên' => 'teacher',
+                'ta', 'tro_ly', 'trợ lý', 'assistant', 'trợ lý lớp học' => 'ta',
+                default => 'student',
             };
 
-            // Định dạng dữ liệu trả ra cho View & Controller xử lý tiếp
-            $accounts[] = [
-                'id'    => trim((string) $source['id']),
-                'name'  => trim((string) $source['name']),
-                'email' => trim((string) $source['email']),
+            $generatedId = $nextId;
+            $nextId++; // Tự động cộng 1 đơn vị cho tài khoản kế tiếp trong danh sách
+
+            $processedAccounts[] = [
+                'id'    => $generatedId,
+                'name'  => $name,
+                'email' => $email,
                 'role'  => $role,
             ];
         }
 
-        return $accounts;
+        return $processedAccounts;
     }
 
     private function mapHeaderRow(array $header, array $row): array
@@ -194,10 +237,10 @@ class AccountImportService
     private function canonicalKey(string $key): string
     {
         return match ($key) {
-            'id', 'ma', 'ma_tai_khoan', 'user_code', 'ma_nhan_su' => 'id',
-            'ho_ten', 'ten', 'name', 'full_name'                 => 'name',
-            'email', 'thu_dien_tu'                                => 'email',
-            'vai_tro', 'role', 'chuc_vu'                          => 'role',
+            'id', 'ma', 'ma_tai_khoan', 'user_code' => 'id',
+            'name', 'ten', 'ho_ten' => 'name',
+            'email' => 'email',
+            'role', 'vai_tro' => 'role',
             default => $key,
         };
     }

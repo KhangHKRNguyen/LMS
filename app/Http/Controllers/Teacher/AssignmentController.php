@@ -6,6 +6,7 @@ use App\Models\Assignment;
 use App\Models\CourseClass;
 use App\Models\AssignmentDistribution;
 use App\Services\ExcelImportService;
+use App\Services\NotificationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -270,7 +271,7 @@ class AssignmentController extends Controller
         ]);
 
         // Tạo bản ghi phân phối bài thi vào bảng dữ liệu điều phối bài tập
-        AssignmentDistribution::create([
+        $distribution = AssignmentDistribution::create([
             'assignment_id'    => $exam->id,
             'user_id'          => Auth::id(),
             'duration_minutes' => $request->input('duration_minutes'), // Nhận từ ô nhập liệu trên form
@@ -280,6 +281,10 @@ class AssignmentController extends Controller
             'status'           => 'active',
             'lesson_session_id'=> $request->input('lesson_session_id'), // Nhận ID buổi học từ form chọn
         ]);
+
+        if ($distribution->open_time && $distribution->open_time->lte(now())) {
+            app(NotificationService::class)->notifyAssignmentOpened($distribution);
+        }
 
         return redirect()->route('teacher.exams.index')->with('success', 'Đã phân phối giao bài tập đến buổi học thành công!');
     }

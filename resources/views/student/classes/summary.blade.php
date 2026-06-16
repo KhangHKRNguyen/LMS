@@ -113,8 +113,9 @@
                     <div class="mt-4 p-3 rounded-3 bg-light border-start border-3" style="border-color: #800000 !important;">
                         <h6 class="fw-bold text-dark small mb-1"> Lưu ý quy chế học tập:</h6>
                         <ul class="m-0 text-muted ps-3 font-monospace" style="font-size: 12px; line-height: 1.6;">
-                            <li>Học viên vắng quá số buổi quy định hoặc không đạt mức điểm tối thiểu sẽ tính là Không đạt.</li>
-                            <li>Nếu có bất kỳ thắc mắc nào về bảng điểm tổng kết, vui lòng liên hệ trực tiếp Trợ giảng lớp học để được hỗ trợ phúc khảo.</li>
+                            <li>Học viên có điểm số cuối khóa thấp hơn điểm chuẩn đầu ra của khóa học hoặc không tham gia thi sẽ tính là <strong>Không đạt</strong>.</li>
+                            <li>Các thông số về số buổi nghỉ và thiếu bài tập dùng để đánh giá mức độ chuyên cần và không trực tiếp ảnh hưởng tới kết quả đầu ra.</li>
+                            <li>Nếu có bất kỳ thắc mắc nào về bảng điểm tổng kết, vui lòng liên hệ trực tiếp Trợ giảng lớp học để được hỗ trợ.</li>
                         </ul>
                     </div>
 

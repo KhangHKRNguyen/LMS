@@ -70,11 +70,24 @@
                             <td class="pe-4 text-end">
                                 <div class="d-flex justify-content-end gap-1">
                                     {{-- NÚT PHẢN HỒI MỌC RA KHI CÓ TIN NHẮN HỌC VIÊN CHAT --}}
+                                    @php
+                                        $hasStudentFeedback = \App\Models\Feedback::where('submission_id', $sub->id)->exists();
+
+                                        $hasUnreadFeedback = \App\Models\Feedback::where('submission_id', $sub->id)
+                                            ->where('user_id', $sub->user_id)
+                                            ->where('is_read', 0)   
+                                            ->exists();
+                                    @endphp
+
                                     @if($hasStudentFeedback)
                                         <a href="{{ route('teacher.submissions.feedback', [$class->id, $sub->id]) }}" 
                                         class="btn btn-sm btn-warning fw-bold px-2 position-relative shadow-sm text-dark">
                                             Phản hồi
-                                            <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                                            
+                                            {{-- CHỈ HIỂN THỊ DẤU CHẤM ĐỎ NẾU CÓ TIN NHẮN CHƯA ĐỌC --}}
+                                            @if($hasUnreadFeedback)
+                                                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                                            @endif
                                         </a>
                                     @endif
 

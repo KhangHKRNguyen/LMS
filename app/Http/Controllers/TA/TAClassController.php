@@ -8,6 +8,7 @@ use App\Models\Attendance;
 use App\Models\AssignmentDistribution;
 use App\Models\LearningResult;
 use App\Models\LessonSession;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -72,16 +73,16 @@ class TAClassController extends Controller
             $student->final_grade = $learningResult ? $learningResult->final_grade : null;
             $student->approval_status = $learningResult ? $learningResult->approval_status : 'Chờ';
 
+            app(NotificationService::class)->notifyAttendanceWarning($class, $student, $student->total_absent);
+            app(NotificationService::class)->notifyMissingAssignmentWarning($class, $student, $student->total_missing);
+
             $outputOverall = (float)($class->course->output_overall ?? 0);
             $finalGrade = $student->final_grade !== null ? (float)$student->final_grade : null;
 
-            $isConditionBreached = ($student->total_absent >= 5 || $student->total_missing >= 9);
-            $isGradeAchieved = ($finalGrade !== null && $finalGrade >= $outputOverall);
-
-            if ($isConditionBreached && !$isGradeAchieved) {
-                $student->output_status = 'Không đạt';
-            } else {
+            if ($finalGrade !== null && $finalGrade >= $outputOverall) {
                 $student->output_status = 'Đạt';
+            } else {
+                $student->output_status = 'Không đạt';
             }
         }
 
@@ -176,6 +177,20 @@ class TAClassController extends Controller
                 ]
             );
         }
+
+        $recipients = $class->users()
+            ->whereIn('users.role_id', [2, 3, 4])
+            ->get();
+
+        app(NotificationService::class)->send(
+            "Kết quả tổng kết đã được phê duyệt - {$class->class_name}",
+            "Kết quả tổng kết của lớp {$class->class_name} đã được phê duyệt.",
+            $recipients,
+            null,
+            'summary_approved',
+            false,
+            true
+        );
 
         return redirect()->back()->with('success', 'Phê duyệt toàn bộ kết quả tổng kết thành công!');
     }

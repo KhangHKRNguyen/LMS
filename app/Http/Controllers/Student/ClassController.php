@@ -11,6 +11,7 @@ use App\Models\Question;
 use App\Models\QuestionOption;
 use App\Models\Material;
 use App\Services\IeltsScoreService;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -35,7 +36,6 @@ class ClassController extends Controller
         return view('student.dashboard', compact('classes'));
     }
 
-    // Không gian lớp học - Danh sách bài tập
     // Không gian lớp học - Danh sách bài tập
     public function show(CourseClass $class)
     {
@@ -241,15 +241,41 @@ class ClassController extends Controller
                 $readingBand = $totalReading > 0 ? round(($correctReading / $totalReading) * 9, 1) : null;
             }
 
-            $submission->update([
+            $scoreUpdates = [
                 'listening_grade' => $listeningBand,
                 'reading_grade' => $readingBand,
-            ]);
+            ];
+
+            $submission->fill($scoreUpdates);
+
+            $hasManualQuestions = $questions->contains(function ($question) {
+                return in_array($question->question_type, ['writing', 'speaking'], true);
+            });
+
+            if (! $hasManualQuestions) {
+                $submission->total_grade = IeltsScoreService::calculateOverall([
+                    $submission->listening_grade,
+                    $submission->reading_grade,
+                    $submission->writing_grade,
+                    $submission->speaking_grade,
+                ]);
+                $submission->status = 'graded';
+            }
+
+            $submission->save();
 
             DB::commit();
+            $successMessage = $hasManualQuestions
+                ? 'Nop bai thanh cong! Hay doi giao vien cham diem Writing/Speaking.'
+                : 'Nop bai thanh cong! Bai lam da duoc cham tu dong va tinh overall.';
+
+            return redirect()->route('student.classes.assignments.detail', [$classId, $distributionId])
+                             ->with('success', $successMessage);
+            /*
             return redirect()->route('student.classes.assignments.detail', [$classId, $distributionId])
                              ->with('success', 'Nộp bài thành công! Hãy đợi giáo viên chấm điểm Writing/Speaking.');
 
+            */
         } catch (\Exception $e) {
             DB::rollBack();
             return redirect()->back()->with('error', 'Lỗi trong quá trình nộp bài: ' . $e->getMessage());
@@ -327,6 +353,17 @@ class ClassController extends Controller
             'user_id' => Auth::id(),
             'submission_id' => $submission->id,
         ]);
+
+        $distribution = AssignmentDistribution::with('assignment', 'teacher')->find($distributionId);
+        if ($distribution?->teacher) {
+            app(NotificationService::class)->send(
+                'Học viên gửi thắc mắc về bài tập',
+                Auth::user()->name . " đã gửi thắc mắc trong bài {$distribution->assignment?->title}.",
+                $distribution->teacher,
+                Auth::id(),
+                'feedback_student_question'
+            );
+        }
 
         return redirect()->back()->with('success', 'Gửi phản hồi đến giảng viên thành công!');
     }
@@ -446,14 +483,10 @@ class ClassController extends Controller
         $finalGrade = $learningResult ? $learningResult->final_grade : null;
         $outputOverall = $class->course->output_overall ?? 0;
 
-        $isConditionBreached = ($totalAbsent >= 5 || $totalMissing >= 9);
-        $isGradeAchieved = ($finalGrade !== null && $finalGrade >= $outputOverall);
-
-        // Giữ nguyên bản logic toán tử (&&) chuẩn nghiệp vụ của TA
-        if ($isConditionBreached && !$isGradeAchieved) {
-            $outputStatus = 'Không đạt';
-        } else {
+        if ($finalGrade !== null && $finalGrade >= $outputOverall) {
             $outputStatus = 'Đạt';
+        } else {
+            $outputStatus = 'Không đạt';
         }
         // =========================================================================
 

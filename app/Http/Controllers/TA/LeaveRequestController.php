@@ -5,6 +5,7 @@ namespace App\Http\Controllers\TA;
 use App\Http\Controllers\Controller;
 use App\Models\LeaveRequest;
 use App\Models\CourseClass; // Bổ sung Model để lấy thông tin lớp học
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -59,6 +60,16 @@ class LeaveRequestController extends Controller
             'status'      => $request->status,
             'approver_id' => Auth::id() 
         ]);
+
+        $leaveRequest->load('student', 'lessonSession.courseClass');
+        $statusLabel = in_array($request->status, ['approved', 'Đã duyệt']) ? 'được duyệt' : 'bị từ chối';
+        app(NotificationService::class)->send(
+            'Kết quả đơn xin nghỉ học',
+            "Đơn xin nghỉ học của bạn tại lớp {$leaveRequest->lessonSession?->courseClass?->class_name} đã {$statusLabel}.",
+            $leaveRequest->student,
+            Auth::id(),
+            'leave_request_updated'
+        );
 
         return redirect()->back()->with('success', 'Cập nhật trạng thái đơn xin nghỉ thành công!');
     }

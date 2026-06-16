@@ -10,7 +10,7 @@ use ZipArchive;
 
 class ClassMemberImportService
 {
-    public function importMembers(UploadedFile $file): array
+    public function importMembers(UploadedFile $file, $class): array
     {
         $extension = Str::lower($file->getClientOriginalExtension());
 
@@ -22,7 +22,7 @@ class ClassMemberImportService
             ]),
         };
 
-        return $this->validateAndNormalize($rows);
+        return $this->validateAndNormalize($rows, $class);
     }
 
     public function sampleCsvContent(): string
@@ -109,51 +109,84 @@ class ClassMemberImportService
         return $index - 1;
     }
 
-    private function validateAndNormalize(array $rows): array
+    private function validateAndNormalize(array $rows, $class): array
     {
-        $rows = array_values(array_filter($rows, fn ($row) => count(array_filter($row, fn ($value) => trim((string) $value) !== '')) > 0));
-        if (empty($rows)) {
-            throw ValidationException::withMessages(['import_file' => 'File không có dữ liệu thành viên.']);
-        }
+        if (empty($rows)) return [];
 
-        $firstCell = Str::lower(trim($rows[0][0]));
-        $hasHeader = in_array($firstCell, ['id', 'user_code', 'ma', 'ma_tai_khoan', 'ma_thanh_vien']);
+        // Lấy ô đầu tiên và xóa bỏ ký tự BOM ẩn (\xEF\xBB\xBF) nếu có
+        $firstCell = isset($rows[0][0]) ? trim((string)$rows[0][0]) : '';
+        $firstCellClean = str_replace("\xEF\xBB\xBF", "", $firstCell);
+
+        // Kiểm tra tiêu đề chính xác sau khi đã làm sạch
+        $hasHeader = (Str::lower($firstCellClean) === 'id' || Str::lower($firstCellClean) === 'ma');
         $dataRows = $hasHeader ? array_slice($rows, 1) : $rows;
 
         $members = [];
+        $fileProcessedIds = []; // Mảng theo dõi ID trùng lặp nội bộ trong file import
+
+        // YÊU CẦU 2A: Lấy danh sách toàn bộ ID của các thành viên ĐÃ CÓ MẶT trong lớp này
+        $existingUserIdsInClass = $class->users()->pluck('users.id')->toArray();
+
         foreach ($dataRows as $row) {
-            $id = trim((string)($row[0] ?? '')); // Đổi tên biến sang id cho đúng bản chất
+            $id = trim((string)($row[0] ?? '')); 
             if ($id === '') continue;
 
-            // SỬA LỖI CHÍNH: Tìm trực tiếp bằng User::find() vì id chính là mã chuỗi định danh (Ví dụ M002174)
+            // YÊU CẦU 2B: Kiểm tra xem ID có bị trùng lặp dòng ngay trong file Excel/CSV không
+            if (in_array($id, $fileProcessedIds)) {
+                $members[] = [
+                    'id'          => $id, 
+                    'name'        => 'N/A',
+                    'role_text'   => 'Không rõ',
+                    'status_text' => 'Bị trùng lặp dòng ngay trong file import',
+                    'is_valid'    => false
+                ];
+                continue;
+            }
+            $fileProcessedIds[] = $id;
+
             $user = User::find($id);
 
             if (!$user) {
                 $members[] = [
-                    'id'          => $id, // Đồng bộ key thành 'id' khớp với giao diện hiển thị preview
+                    'id'          => $id, 
                     'name'        => 'N/A',
                     'role_text'   => 'Không rõ',
                     'status_text' => 'Tài khoản không tồn tại',
                     'is_valid'    => false
                 ];
             } else {
-                $roleMapping = [
-                    1 => 'Quản trị viên',
-                    2 => 'Giảng viên',
-                    3 => 'Trợ lý lớp học',
-                    4 => 'Học viên'
-                ];
+                // YÊU CẦU 2C: Kiểm tra tài khoản này đã tồn tại trong lớp học này chưa
+                if (in_array($user->id, $existingUserIdsInClass)) {
+                    $members[] = [
+                        'id'          => $user->id,
+                        'name'        => $user->name,
+                        'role_text'   => $this->getRoleName($user->role_id), 
+                        'status_text' => 'Đã tồn tại trong lớp học này rồi',
+                        'is_valid'    => false 
+                    ];
+                    continue;
+                }
 
                 $members[] = [
                     'id'          => $user->id,
                     'name'        => $user->name,
-                    'role_text'   => $roleMapping[$user->role_id] ?? 'Không rõ', // Đổi từ $user->role sang $user->role_id
-                    'status_text' => $user->status === 'active' ? 'Hợp lệ' : 'Bị khóa',
+                    'role_text'   => $this->getRoleName($user->role_id), 
+                    'status_text' => $user->status === 'active' ? 'Hợp lệ' : 'Tài khoản đang bị khóa',
                     'is_valid'    => $user->status === 'active'
                 ];
             }
         }
-
         return $members;
+    }
+
+    private function getRoleName(?int $roleId): string
+    {
+        return match($roleId) {
+            1 => 'Quản trị viên',
+            2 => 'Giảng viên',
+            3 => 'Trợ giảng',
+            4 => 'Học viên',
+            default => 'Không xác định'
+        };
     }
 }

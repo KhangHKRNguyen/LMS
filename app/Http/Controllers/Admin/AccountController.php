@@ -194,8 +194,7 @@ class AccountController extends Controller
             "Expires"             => "0"
         ];
 
-        // ĐÃ SỬA: Thêm cột tiêu đề 'id' vào đầu mảng để đồng bộ tuyệt đối với AccountImportService
-        $columns = ['id', 'name', 'email', 'role'];
+        $columns = ['name', 'email', 'role'];
 
         $callback = function() use($columns) {
             $file = fopen('php://output', 'w');
@@ -205,8 +204,8 @@ class AccountController extends Controller
             fputcsv($file, $columns);
             
             // ĐÃ SỬA: Thêm giá trị mã định danh mẫu (ID) vào các dòng dữ liệu ví dụ
-            fputcsv($file, ['M008821', 'Nguyễn Văn Học Viên', 'hocvien@example.com', 'student']);
-            fputcsv($file, ['M002174', 'Trần Thị Giảng Viên', 'giangvien@example.com', 'teacher']);
+            fputcsv($file, ['Nguyễn Văn Học Viên', 'hocvien@example.com', 'student']);
+            fputcsv($file, ['Trần Thị Giảng Viên', 'giangvien@example.com', 'teacher']);
             
             fclose($file);
         };

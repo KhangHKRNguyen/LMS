@@ -11,9 +11,15 @@
     <div class="d-flex justify-content-end align-items-center mb-4">
         <div class="d-flex align-items-center gap-3">
 
-            <div class="position-relative">
-                <i class="bi bi-bell-fill fs-4 text-secondary"></i>
-            </div>
+            @php($unreadNotificationCount = Auth::user()->unreadNotifications()->count())
+            <a href="{{ route('notifications.index') }}" class="position-relative text-decoration-none" title="Thông báo">
+                <i class="bi bi-bell-fill fs-4 {{ $unreadNotificationCount > 0 ? 'text-danger' : 'text-secondary' }}"></i>
+                @if($unreadNotificationCount > 0)
+                    <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
+                        {{ $unreadNotificationCount > 99 ? '99+' : $unreadNotificationCount }}
+                    </span>
+                @endif
+            </a>
 
             <div class="dropdown">
                 <div

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\CourseClass;
 use App\Models\LessonSession;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
@@ -130,6 +131,16 @@ class AttendanceController extends Controller
 
             // Đánh dấu buổi học này đã được xử lý điểm danh vào DB
             LessonSession::where('id', $sessionId)->update(['attendance_status' => 'đã điểm danh']);
+        }
+
+        $lessonSessionIds = $class->lessonSessions()->pluck('id');
+        foreach ($class->students as $student) {
+            $totalAbsent = Attendance::where('user_id', $student->id)
+                ->whereIn('lesson_session_id', $lessonSessionIds)
+                ->whereIn('status', ['absent', 'Vắng'])
+                ->count();
+
+            app(NotificationService::class)->notifyAttendanceWarning($class, $student, $totalAbsent);
         }
 
         return redirect()->back()->with('success', 'Xác nhận và cập nhật dữ liệu điểm danh thành công!');

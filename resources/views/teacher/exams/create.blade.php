@@ -8,7 +8,7 @@
         <a href="{{ route('teacher.exams.index') }}" class="text-decoration-none text-secondary"><i class="bi bi-arrow-left"></i> Quay lại</a>
     </div>
 
-    <form action="{{ route('teacher.exams.store') }}" method="POST" enctype="multipart/form-data">
+    <form id="exam-form" action="{{ route('teacher.exams.store') }}" method="POST" enctype="multipart/form-data">
         @csrf
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body p-4">
@@ -92,10 +92,7 @@ function addQuestion() {
                         </select>
                         <div id="hidden-skill-container-${questionCount}"></div>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label small fw-semibold">Điểm số câu này</label>
-                        <input type="number" step="0.1" class="form-control form-control-sm" name="questions[${questionCount}][points]" value="1.0" required>
-                    </div>
+                    <input type="hidden" name="questions[${questionCount}][points]" value="1">
                 </div>
 
                 <div class="mb-3">
@@ -314,6 +311,22 @@ document.getElementById('add-question-btn').addEventListener('click', addQuestio
 document.addEventListener("DOMContentLoaded", function() {
     if(questionCount === 0) {
         addQuestion();
+    }
+});
+
+document.getElementById('exam-form').addEventListener('submit', function(event) {
+    const selectedSkillIds = new Set(
+        Array.from(this.querySelectorAll('[name$="[skill_id]"]'))
+            .map((input) => input.value)
+            .filter(Boolean)
+    );
+
+    if (selectedSkillIds.size < 4) {
+        const confirmed = confirm('Đề thi này chưa đủ 4 kỹ năng. Hệ thống sẽ chỉ chấm điểm và tính overall trên các kỹ năng có trong đề. Bạn có muốn tiếp tục lưu không?');
+
+        if (!confirmed) {
+            event.preventDefault();
+        }
     }
 });
 </script>

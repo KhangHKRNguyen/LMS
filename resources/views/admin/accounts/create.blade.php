@@ -105,7 +105,7 @@
                 {{-- Chỉ hiển thị bảng nếu thực sự tồn tại biến mảng $previewUsers được truyền sang --}}
                 @if(!empty($previewUsers) && count($previewUsers) > 0) 
                 <div class="mt-4">
-                    <h5 class="fw-bold mb-3 text-secondary"><i class="bi bi-eye"></i> Danh sách tài khoản xem trước trước khi lưu</h5>
+                    <h5 class="fw-bold mb-3 text-secondary">Danh sách tài khoản xem trước trước khi lưu</h5>
                     <div class="table-responsive shadow-sm mb-4" style="max-height: 400px; overflow-y: auto;">
                         <table class="table-arena m-0">
                             <thead>

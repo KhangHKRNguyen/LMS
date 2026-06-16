@@ -7,7 +7,7 @@ class IeltsScoreService
     /**
      * Tự động làm tròn điểm số theo quy tắc IELTS (.25 và .75)
      */
-    private static function roundIelts(float $score): float
+    public static function roundIelts(float $score): float
     {
         $floor = floor($score);
         $remainder = $score - $floor;
@@ -24,10 +24,10 @@ class IeltsScoreService
     /**
      * Tính điểm Band tự động cho Reading / Listening dựa trên tỷ lệ câu đúng
      */
-    public static function calculateSkillBand(int $correctCount, int $totalQuestions): float
+    public static function calculateSkillBand(int $correctCount, int $totalQuestions): ?float
     {
         if ($totalQuestions === 0) {
-            return 0.0;
+            return null;
         }
 
         // Tính điểm thô trên thang 9
@@ -40,9 +40,15 @@ class IeltsScoreService
     /**
      * Tính điểm Overall trung bình cộng của 4 kỹ năng
      */
-    public static function calculateOverall(float $l, float $r, float $w, float $s): float
+    public static function calculateOverall(array $scores): ?float
     {
-        $average = ($l + $r + $w + $s) / 4;
+        $validScores = array_values(array_filter($scores, fn ($score) => $score !== null));
+
+        if (count($validScores) === 0) {
+            return null;
+        }
+
+        $average = array_sum($validScores) / count($validScores);
         
         return self::roundIelts($average);
     }

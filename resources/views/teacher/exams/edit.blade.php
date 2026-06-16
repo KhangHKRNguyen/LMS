@@ -8,7 +8,7 @@
         <a href="{{ route('teacher.exams.index') }}" class="text-decoration-none text-secondary"><i class="bi bi-x-circle"></i> Hủy và quay lại</a>
     </div>
 
-    <form action="{{ route('teacher.exams.update', $exam->id) }}" method="POST" enctype="multipart/form-data">
+    <form id="exam-form" action="{{ route('teacher.exams.update', $exam->id) }}" method="POST" enctype="multipart/form-data">
         @csrf @method('PUT')
         <div class="card shadow-sm border-0 mb-4">
             <div class="card-body p-4">
@@ -73,8 +73,7 @@
                                 </select>
                             </div>
                             <div class="col-md-4">
-                                <label class="form-label small fw-bold">Điểm số</label>
-                                <input type="number" step="0.1" name="questions[{{ $qIndex }}][points]" class="form-control form-control-sm" value="{{ $question->points }}" required>
+                                <input type="hidden" name="questions[{{ $qIndex }}][points]" value="1">
                             </div>
                             <div class="col-md-12">
                                 <label class="form-label small fw-bold">Nội dung câu hỏi / Yêu cầu đề</label>
@@ -130,4 +129,22 @@
         </div>
     </form>
 </div>
+
+<script>
+document.getElementById('exam-form').addEventListener('submit', function(event) {
+    const selectedSkillIds = new Set(
+        Array.from(this.querySelectorAll('[name$="[skill_id]"]'))
+            .map((input) => input.value)
+            .filter(Boolean)
+    );
+
+    if (selectedSkillIds.size < 4) {
+        const confirmed = confirm('Đề thi này chưa đủ 4 kỹ năng. Hệ thống sẽ chỉ chấm điểm và tính overall trên các kỹ năng có trong đề. Bạn có muốn tiếp tục lưu không?');
+
+        if (!confirmed) {
+            event.preventDefault();
+        }
+    }
+});
+</script>
 @endsection

@@ -7,6 +7,7 @@ use App\Models\Course;
 use App\Models\CourseClass;
 use App\Models\User;
 use App\Services\ClassMemberImportService;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -212,7 +213,8 @@ class ClassController extends Controller
             ]);
 
             try {
-                $previewMembers = $this->importService->importMembers($request->file('import_file'));
+                //Truyền thêm thực thể $class vào tham số thứ hai để Service check trùng lặp ID trong lớp
+                $previewMembers = $this->importService->importMembers($request->file('import_file'), $class);
             } catch (\Exception $e) {
                 return back()->with('error', 'Lỗi phân tích file: ' . $e->getMessage());
             }
@@ -258,6 +260,7 @@ class ClassController extends Controller
 
         // Đính kèm bản ghi vào bảng trung gian class_user
         $class->users()->attach($user->id);
+        app(NotificationService::class)->notifyMemberAdded($class, $user);
 
         return redirect()->route('admin.classes.members', $class->id)
             ->with('success', "Đã thêm thành viên \"{$user->name}\" vào lớp học thành công!");
@@ -295,18 +298,22 @@ class ClassController extends Controller
         DB::beginTransaction();
         try {
             $successCount = 0;
+            $addedUsers = collect();
             foreach ($membersArray as $memberData) {
-                // Chỉ xử lý các bản ghi được Service đánh dấu hợp lệ (có id tài khoản thực tế sống trong hệ thống)
-                if (isset($memberData['id'])) {
+                // Kiểm tra điều kiện: chỉ thêm nếu dòng dữ liệu đó được xác nhận hợp lệ (is_valid == true)
+                if (isset($memberData['id']) && isset($memberData['is_valid']) && $memberData['is_valid'] == true) {
                     $user = User::find($memberData['id']);
                     
                     if ($user && !$class->users()->where('user_id', $user->id)->exists()) {
                         $class->users()->attach($user->id);
+                        $addedUsers->push($user);
                         $successCount++;
                     }
                 }
             }
             DB::commit();
+
+            $addedUsers->each(fn (User $user) => app(NotificationService::class)->notifyMemberAdded($class, $user));
 
             return redirect()->route('admin.classes.members', $class->id)
                 ->with('success', "Đã nạp thành công hàng loạt {$successCount} thành viên vào lớp học!");
@@ -323,8 +330,8 @@ class ClassController extends Controller
             return back()->with('error', 'Vui lòng chọn file dữ liệu!');
         }
 
-        // Gọi đúng tên hàm importMembers và truyền file vào
-        $previewMembers = $this->importService->importMembers($request->file('import_file')); 
+        // ĐÃ SỬA: Truyền thêm thực thể $class vào tham số thứ hai để kiểm tra trùng lặp ID
+        $previewMembers = $this->importService->importMembers($request->file('import_file'), $class); 
 
         return view('admin.classes.members', compact('class', 'previewMembers'));
     }

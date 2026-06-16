@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Student;
 use App\Http\Controllers\Controller;
 use App\Models\LeaveRequest;
 use App\Models\LessonSession;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
@@ -62,7 +63,7 @@ class LeaveRequestController extends Controller
 
         $status = ($request->action === 'submit_now') ? 'Chờ duyệt' : 'Nháp';
 
-        LeaveRequest::create([
+        $leaveRequest = LeaveRequest::create([
             'reason'            => $request->reason,
             'attachment'        => $attachmentPath,
             'status'            => $status,
@@ -70,6 +71,10 @@ class LeaveRequestController extends Controller
             'lesson_session_id' => $request->lesson_session_id,
             'submitted_at'      => ($status === 'Chờ duyệt') ? now() : null,
         ]);
+
+        if ($request->action === 'submit_now') {
+            app(NotificationService::class)->notifyLeaveRequestSubmitted($leaveRequest);
+        }
 
         return redirect()->back()->with('success', $status === 'Chờ duyệt' ? 'Gửi đơn xin nghỉ thành công!' : 'Lưu nháp thành công!');
     }
@@ -121,6 +126,8 @@ class LeaveRequestController extends Controller
             'status' => 'Chờ duyệt',
             'submitted_at' => now()
         ]);
+
+        app(NotificationService::class)->notifyLeaveRequestSubmitted($leaveRequest);
 
         return redirect()->back()->with('success', 'Gửi đơn xin nghỉ thành công!');
     }

@@ -113,4 +113,14 @@ class User extends Authenticatable
     {
         return $this->hasMany(\App\Models\LearningResult::class, 'user_id');
     }
+
+    public function notificationRecipients(): HasMany
+    {
+        return $this->hasMany(NotificationRecipient::class, 'user_id');
+    }
+
+    public function unreadNotifications(): HasMany
+    {
+        return $this->notificationRecipients()->where('is_read', false);
+    }
 }

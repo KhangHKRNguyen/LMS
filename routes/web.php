@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Admin\AccountController;
 use App\Http\Controllers\Admin\ClassController;
@@ -46,6 +47,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+    Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+    Route::patch('/notifications/read-all', [NotificationController::class, 'markAllAsRead'])->name('notifications.read_all');
+    Route::patch('/notifications/{recipient}/read', [NotificationController::class, 'markAsRead'])->name('notifications.read');
     
 });
 Route::middleware(['auth', 'role:admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -148,4 +152,59 @@ Route::middleware(['auth', 'role:student'])->prefix('student')->name('student.')
     Route::get('/classes/{class}/assignments/{distribution}/submissions/{submission}/feedback', [StudentClassController::class, 'feedbackChat'])->name('classes.assignments.submissions.feedback');
     Route::post('/classes/{class}/assignments/{distribution}/submissions/{submission}/feedback/send', [StudentClassController::class, 'sendFeedback'])->name('classes.assignments.submissions.feedback.send');
 });
+
+Route::get('/captcha-image', function () {
+    // 1. Sinh chuỗi ký tự ngẫu nhiên
+    $charset = 'aeiouDT';
+    $length = 7;
+    $captchaString = '';
+    for ($i = 0; $i < $length; $i++) {
+        $captchaString .= $charset[random_int(0, strlen($charset) - 1)];
+    }
+
+    session(['captcha_code' => $captchaString]);
+
+    // 2. Tạo kích thước khung ảnh
+    $width = 220;
+    $height = 70;
+    $image = imagecreatetruecolor($width, $height);
+
+    // 3. Cấu hình màu sắc cơ bản
+    $background = imagecolorallocate($image, 245, 245, 245);
+    $border = imagecolorallocate($image, 200, 200, 200);
+    $colors = [
+        imagecolorallocate($image, 35, 65, 120),
+        imagecolorallocate($image, 80, 120, 50),
+        imagecolorallocate($image, 150, 50, 100),
+        imagecolorallocate($image, 90, 40, 120),
+    ];
+
+    imagefilledrectangle($image, 0, 0, $width, $height, $background);
+    imagerectangle($image, 0, 0, $width - 1, $height - 1, $border);
+
+    // 4. Vẽ các đường thẳng nhiễu chống bot
+    for ($i = 0; $i < 50; $i++) {
+        $noiseColor = imagecolorallocate($image, random_int(150, 220), random_int(150, 220), random_int(150, 220));
+        imageline($image, random_int(0, $width), random_int(0, $height), random_int(0, $width), random_int(0, $height), $noiseColor);
+    }
+
+    // 5. Vẽ chữ lên hình
+    $charSpace = (int)($width / $length);
+    for ($i = 0; $i < strlen($captchaString); $i++) {
+        $char = $captchaString[$i];
+        $x = 16 + $i * $charSpace;
+        $color = $colors[array_rand($colors)];
+        imagestring($image, 5, $x, (int)($height / 4) + random_int(-5, 5), $char, $color);
+    }
+
+    ob_start();
+    imagepng($image);
+    $imageData = ob_get_clean();
+    imagedestroy($image);
+
+    return response($imageData)
+        ->header('Content-Type', 'image/png')
+        ->header('Cache-Control', 'no-cache, no-store, must-revalidate');
+});
+
 require __DIR__.'/auth.php';

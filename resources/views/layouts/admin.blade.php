@@ -16,6 +16,10 @@
             class="sidebar-menu-item {{ Request::routeIs('admin.accounts.*') ? 'active' : '' }}">
             QUẢN LÝ TÀI KHOẢN
         </a>
+        <a href="{{ route('notifications.index') }}"
+            class="sidebar-menu-item {{ Request::routeIs('notifications.*') ? 'active' : '' }}">
+            THÔNG BÁO
+        </a>
     </div>
 </div>
 @endsection

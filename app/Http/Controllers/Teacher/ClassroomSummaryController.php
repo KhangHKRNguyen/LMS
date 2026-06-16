@@ -61,13 +61,10 @@ class ClassroomSummaryController extends Controller
             $outputOverall = (float)($class->course->output_overall ?? 0);
             $finalGrade = $student->final_grade !== null ? (float)$student->final_grade : null;
 
-            $isConditionBreached = ($student->total_absent >= 5 || $student->total_missing >= 9);
-            $isGradeAchieved = ($finalGrade !== null && $finalGrade >= $outputOverall);
-
-            if ($isConditionBreached && !$isGradeAchieved) {
-                $student->output_status = 'Không đạt';
-            } else {
+            if ($finalGrade !== null && $finalGrade >= $outputOverall) {
                 $student->output_status = 'Đạt';
+            } else {
+                $student->output_status = 'Không đạt';
             }
         }
 

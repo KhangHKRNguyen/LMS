@@ -24,6 +24,24 @@
             <x-input-error :messages="$errors->get('password')" class="mt-2" />
         </div>
 
+        @if (session('login_attempts', 0) >= 2)
+            <div class="mt-4">
+                <x-input-label for="captcha" :value="__('Mã xác nhận (Captcha)')" />
+                
+                <div class="flex items-center mt-1 gap-2">
+                    <img src="{{ url('/captcha-image') }}" id="captcha-img" class="rounded border" alt="Captcha">
+                    <button type="button" 
+                            onclick="document.getElementById('captcha-img').src = '{{ url('/captcha-image') }}?' + Math.random()" 
+                            class="text-sm text-gray-500 hover:underline">
+                        {{ __('Đổi mã khác') }}
+                    </button>
+                </div>
+
+                <x-text-input id="captcha" class="block mt-2 w-full" type="text" name="captcha" required placeholder="Nhập chữ hoa chữ thường chính xác" />
+                <x-input-error :messages="$errors->get('captcha')" class="mt-2" />
+            </div>
+        @endif
+
         <!-- Remember Me -->
         <div class="block mt-4">
             <label for="remember_me" class="inline-flex items-center">
@@ -36,12 +54,6 @@
             @if (Route::has('password.request'))
                 <a class="underline text-sm rounded-md focus:outline-none me-4" href="{{ route('password.request') }}" style="color: #990000;">
                     {{ __('Quên mật khẩu?') }}
-                </a>
-            @endif
-
-            @if (Route::has('register'))
-                <a class="underline text-sm rounded-md focus:outline-none me-4" href="{{ route('register') }}" style="color: #990000;">
-                    {{ __('Đăng ký') }}
                 </a>
             @endif
 

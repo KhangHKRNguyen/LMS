@@ -153,7 +153,7 @@
                 </div>
                 <div class="table-responsive shadow-sm rounded mb-4">
                     <table class="table m-0 text-center align-middle bg-white table-bordered">
-                        <thead class="table-dark">
+                        <thead class="table-red">
                             <tr>
                                 <th>#</th>
                                 <th>Mã tài khoản</th>

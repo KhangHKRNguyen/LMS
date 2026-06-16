@@ -10,6 +10,7 @@ use App\Models\Submission;
 use App\Models\Question;
 use App\Models\Feedback;
 use App\Services\IeltsScoreService;
+use App\Services\NotificationService;
 use Illuminate\Support\Facades\DB;
 use App\Models\LearningResult;
 use Illuminate\Support\Str;
@@ -97,6 +98,8 @@ class SubmissionController extends Controller
         }
 
         // 3. Tính toán lại điểm Overall (Trung bình cộng của 4 kỹ năng IELTS)
+        $oldOverall = $submission->getOriginal('total_grade');
+
         $skillsCount = 0;
         $totalSum = 0;
 
@@ -124,9 +127,38 @@ class SubmissionController extends Controller
         }
 
         // Cập nhật trạng thái bài nộp thành "Đã chấm"
+        $submission->total_grade = IeltsScoreService::calculateOverall([
+            $submission->listening_grade,
+            $submission->reading_grade,
+            $submission->writing_grade,
+            $submission->speaking_grade,
+        ]);
         $submission->status = 'graded';
         $submission->teacher_comment = $request->input('teacher_comment');
         $submission->save();
+
+        $submission->loadMissing('user', 'assignmentDistribution.assignment');
+        app(NotificationService::class)->send(
+            'Điểm số đã được cập nhật',
+            "Điểm bài {$submission->assignmentDistribution?->assignment?->title} của bạn đã được cập nhật.",
+            $submission->user,
+            null,
+            'grade_updated'
+        );
+
+        if ($oldOverall !== null && (float)$oldOverall !== (float)$submission->total_grade) {
+            DB::table('grade_histories')->insert([
+                'old_grade'     => $oldOverall,
+                'new_grade'     => $submission->total_grade,
+                'changed_at'    => now(),
+                'reason'        => null, // Bỏ trống theo yêu cầu (Cột này cho phép nullable)
+                'question_id'   => null, // Điểm tổng quát nên không gắn với câu hỏi cụ thể
+                'submission_id' => $submission->id,
+                'user_id'       => Auth::id(), // ID của giáo viên thực hiện chấm lại
+                'created_at'    => now(),
+                'updated_at'    => now()
+            ]);
+        }
 
         $distribution = $submission->assignmentDistribution;
         $assignment = $distribution ? $distribution->assignment : null;
@@ -179,6 +211,11 @@ class SubmissionController extends Controller
         $submission->load('user', 'assignmentDistribution.assignment');
         $distribution = $submission->assignmentDistribution;
 
+        Feedback::where('submission_id', $submission->id)
+            ->where('user_id', $submission->user_id)
+            ->where('is_read', 0)   
+            ->update(['is_read' => 1]);
+
         // Lấy lịch sử chat xếp theo thứ tự thời gian tăng dần
         $chats = Feedback::where('submission_id', $submission->id)
             ->with('user')
@@ -200,6 +237,15 @@ class SubmissionController extends Controller
             'user_id' => Auth::id(),
             'submission_id' => $submission->id,
         ]);
+
+        $submission->loadMissing('user', 'assignmentDistribution.assignment');
+        app(NotificationService::class)->send(
+            'Giáo viên đã trả lời phản hồi',
+            "Giáo viên đã trả lời phản hồi trong bài {$submission->assignmentDistribution?->assignment?->title}.",
+            $submission->user,
+            Auth::id(),
+            'feedback_teacher_reply'
+        );
 
         return redirect()->back()->with('success', 'Gửi phản hồi thành công!');
     }
